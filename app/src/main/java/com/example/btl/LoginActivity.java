@@ -1,73 +1,164 @@
 package com.example.btl;
 
+import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
+import android.util.Log;
+import android.util.Patterns;
 import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.example.btl.databinding.ActivityLoginBinding;
+import java.util.HashMap;
+import java.util.Map;
 
 public class LoginActivity extends AppCompatActivity {
-    private EditText emailEditText, passwordEditText;
-    private Button loginButton;
-    private TextView forgotPasswordLink, registerLink;
+    private ActivityLoginBinding binding;
     private FirebaseAuth auth;
+    private FirebaseFirestore db;
+    private static final String TAG = "LoginActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_login);
+        binding = ActivityLoginBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
 
-        emailEditText = findViewById(R.id.emailEditText);
-        passwordEditText = findViewById(R.id.passwordEditText);
-        loginButton = findViewById(R.id.loginButton);
-        forgotPasswordLink = findViewById(R.id.forgotPasswordLink);
-        registerLink = findViewById(R.id.registerLink);
-
+        // Khởi tạo Firebase
         auth = FirebaseAuth.getInstance();
+        db = FirebaseFirestore.getInstance();
 
-        loginButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String email = emailEditText.getText().toString();
-                String password = passwordEditText.getText().toString();
+        // Kiểm tra FirebaseAuth
+        if (auth == null) {
+            Log.e(TAG, "FirebaseAuth instance is null");
+            Toast.makeText(this, "Lỗi khởi tạo FirebaseAuth", Toast.LENGTH_LONG).show();
+            return;
+        }
 
-                auth.signInWithEmailAndPassword(email, password)
-                        .addOnCompleteListener(task -> {
-                            if (task.isSuccessful()) {
-                                Toast.makeText(LoginActivity.this, "Đăng nhập thành công", Toast.LENGTH_SHORT).show();
-                                startActivity(new Intent(LoginActivity.this, MainActivity.class));
-                                finish();
-                            } else {
-                                Toast.makeText(LoginActivity.this, "Lỗi: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
-                            }
-                        });
+        // Kiểm tra nếu người dùng đã đăng nhập
+        FirebaseUser currentUser = auth.getCurrentUser();
+        if (currentUser != null) {
+            Log.d(TAG, "User already logged in: " + currentUser.getUid());
+            startActivity(new Intent(LoginActivity.this, MainActivity.class));
+            finish();
+            return;
+        }
+
+        // Sự kiện nhấn nút đăng nhập
+        binding.loginButton.setOnClickListener(v -> {
+            String email = binding.emailLogin.getText().toString().trim();
+            String password = binding.passwordLogin.getText().toString().trim();
+
+            // Kiểm tra dữ liệu đầu vào
+            if (!validateInput(email, password)) {
+                return;
             }
+
+            // Kiểm tra kết nối mạng
+            if (!isNetworkAvailable()) {
+                Toast.makeText(this, "Không có kết nối mạng. Vui lòng kiểm tra lại!", Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            // Hiển thị loading
+            showLoading(true);
+            Log.d(TAG, "Attempting to login with email: " + email);
+            login(email, password);
         });
 
-        forgotPasswordLink.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String email = emailEditText.getText().toString();
-                if (!email.isEmpty()) {
-                    auth.sendPasswordResetEmail(email)
-                            .addOnCompleteListener(task -> {
-                                if (task.isSuccessful()) {
-                                    Toast.makeText(LoginActivity.this, "Đã gửi email đặt lại mật khẩu", Toast.LENGTH_SHORT).show();
-                                }
-                            });
-                }
-            }
+        // Chuyển đến màn hình đăng ký
+        binding.goToRegister.setOnClickListener(v -> {
+            Log.d(TAG, "Navigating to RegisterActivity");
+            startActivity(new Intent(LoginActivity.this, RegisterActivity.class));
+            finish();
         });
+    }
 
-        registerLink.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startActivity(new Intent(LoginActivity.this, RegisterActivity.class));
-            }
-        });
+    // Kiểm tra dữ liệu đầu vào
+    private boolean validateInput(String email, String password) {
+        if (email.isEmpty()) {
+            binding.emailLogin.setError("Vui lòng nhập email");
+            binding.emailLogin.requestFocus();
+            return false;
+        }
+
+        if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            binding.emailLogin.setError("Email không hợp lệ");
+            binding.emailLogin.requestFocus();
+            return false;
+        }
+
+        if (password.isEmpty()) {
+            binding.passwordLogin.setError("Vui lòng nhập mật khẩu");
+            binding.passwordLogin.requestFocus();
+            return false;
+        }
+
+        if (password.length() < 6) {
+            binding.passwordLogin.setError("Mật khẩu phải có ít nhất 6 ký tự");
+            binding.passwordLogin.requestFocus();
+            return false;
+        }
+
+        return true;
+    }
+
+    // Kiểm tra kết nối mạng
+    private boolean isNetworkAvailable() {
+        ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
+    }
+
+    // Hiển thị/Ẩn loading indicator
+    private void showLoading(boolean isLoading) {
+        binding.loginButton.setEnabled(!isLoading);
+        binding.loginButton.setText(isLoading ? "Đang xử lý..." : "Đăng nhập");
+        // Nếu bạn có ProgressBar trong layout, có thể thêm:
+        // binding.progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+    }
+
+    // Đăng nhập người dùng
+    private void login(String email, String password) {
+        auth.signInWithEmailAndPassword(email, password)
+                .addOnCompleteListener(this, task -> {
+                    if (task.isSuccessful()) {
+                        FirebaseUser user = auth.getCurrentUser();
+                        if (user == null) {
+                            Log.e(TAG, "FirebaseUser is null after login");
+                            Toast.makeText(this, "Đăng nhập thất bại: Không thể lấy thông tin người dùng", Toast.LENGTH_LONG).show();
+                            showLoading(false);
+                            return;
+                        }
+
+                        // Cập nhật trạng thái online
+                        updateOnlineStatus(user.getUid(), true);
+
+                        Log.d(TAG, "Login successful for UID: " + user.getUid());
+                        Toast.makeText(this, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show();
+                        startActivity(new Intent(LoginActivity.this, MainActivity.class));
+                        finish();
+                    } else {
+                        String errorMessage = task.getException() != null ? task.getException().getMessage() : "Lỗi không xác định";
+                        Log.e(TAG, "Login failed: " + errorMessage);
+                        Toast.makeText(this, "Đăng nhập thất bại: " + errorMessage, Toast.LENGTH_LONG).show();
+                    }
+                    showLoading(false);
+                });
+    }
+
+    // Cập nhật trạng thái online
+    private void updateOnlineStatus(String userId, boolean online) {
+        Map<String, Object> status = new HashMap<>();
+        status.put("online", online);
+        db.collection("users").document(userId)
+                .update(status)
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "Updated online status to " + online + " for UID: " + userId))
+                .addOnFailureListener(e -> Log.e(TAG, "Failed to update online status: " + e.getMessage()));
     }
 }
