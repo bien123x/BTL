@@ -54,7 +54,7 @@ dependencies {
     implementation("com.google.firebase:firebase-auth") // F1, F2, F3: Xác thực người dùng
     implementation("com.google.firebase:firebase-firestore") // F4, F14: Lưu trữ dữ liệu
     implementation("com.google.firebase:firebase-database") // F15: Đồng bộ thời gian thực
-
+    implementation ("com.google.firebase:firebase-storage:20.3.0")
     // Google Maps và Location (F5, F6, F7, F8)
     implementation("com.google.android.gms:play-services-maps:18.2.0") // Hiển thị bản đồ
     implementation("com.google.android.gms:play-services-location:21.0.1") // Định vị người chơi
