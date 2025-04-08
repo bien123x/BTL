@@ -1,26 +1,22 @@
-package com.example.btl;
+package com.example.btl.Activity;
 
-import android.content.Context;
 import android.content.Intent;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Patterns;
 import android.view.View;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.FirebaseFirestore;
+import com.example.btl.Domain.Repository.AuthRepository;
+import com.example.btl.Domain.Repository.UserRepository;
+import com.example.btl.Helper.NetworkHelper;
 import com.example.btl.databinding.ActivityLoginBinding;
-import java.util.HashMap;
-import java.util.Map;
 
 public class LoginActivity extends AppCompatActivity {
     private ActivityLoginBinding binding;
-    private FirebaseAuth auth;
-    private FirebaseFirestore db;
+    private AuthRepository authRepository;
+    private UserRepository userRepository;
     private static final String TAG = "LoginActivity";
 
     @Override
@@ -29,19 +25,12 @@ public class LoginActivity extends AppCompatActivity {
         binding = ActivityLoginBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        // Khởi tạo Firebase
-        auth = FirebaseAuth.getInstance();
-        db = FirebaseFirestore.getInstance();
-
-        // Kiểm tra FirebaseAuth
-        if (auth == null) {
-            Log.e(TAG, "FirebaseAuth instance is null");
-            Toast.makeText(this, "Lỗi khởi tạo FirebaseAuth", Toast.LENGTH_LONG).show();
-            return;
-        }
+        // Khởi tạo repository
+        authRepository = new AuthRepository();
+        userRepository = new UserRepository();
 
         // Kiểm tra nếu người dùng đã đăng nhập
-        FirebaseUser currentUser = auth.getCurrentUser();
+        FirebaseUser currentUser = authRepository.getCurrentUser();
         if (currentUser != null) {
             Log.d(TAG, "User already logged in: " + currentUser.getUid());
             startActivity(new Intent(LoginActivity.this, MainActivity.class));
@@ -60,7 +49,7 @@ public class LoginActivity extends AppCompatActivity {
             }
 
             // Kiểm tra kết nối mạng
-            if (!isNetworkAvailable()) {
+            if (!NetworkHelper.isNetworkAvailable(this)) {
                 Toast.makeText(this, "Không có kết nối mạng. Vui lòng kiểm tra lại!", Toast.LENGTH_LONG).show();
                 return;
             }
@@ -108,36 +97,21 @@ public class LoginActivity extends AppCompatActivity {
         return true;
     }
 
-    // Kiểm tra kết nối mạng
-    private boolean isNetworkAvailable() {
-        ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
-        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
-    }
-
     // Hiển thị/Ẩn loading indicator
     private void showLoading(boolean isLoading) {
         binding.loginButton.setEnabled(!isLoading);
         binding.loginButton.setText(isLoading ? "Đang xử lý..." : "Đăng nhập");
-        // Nếu bạn có ProgressBar trong layout, có thể thêm:
-        // binding.progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+//        binding.progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
     }
 
     // Đăng nhập người dùng
     private void login(String email, String password) {
-        auth.signInWithEmailAndPassword(email, password)
+        authRepository.login(email, password)
                 .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
-                        FirebaseUser user = auth.getCurrentUser();
-                        if (user == null) {
-                            Log.e(TAG, "FirebaseUser is null after login");
-                            Toast.makeText(this, "Đăng nhập thất bại: Không thể lấy thông tin người dùng", Toast.LENGTH_LONG).show();
-                            showLoading(false);
-                            return;
-                        }
-
+                        FirebaseUser user = task.getResult();
                         // Cập nhật trạng thái online
-                        updateOnlineStatus(user.getUid(), true);
+                        userRepository.updateOnlineStatus(user.getUid(), true);
 
                         Log.d(TAG, "Login successful for UID: " + user.getUid());
                         Toast.makeText(this, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show();
@@ -150,15 +124,5 @@ public class LoginActivity extends AppCompatActivity {
                     }
                     showLoading(false);
                 });
-    }
-
-    // Cập nhật trạng thái online
-    private void updateOnlineStatus(String userId, boolean online) {
-        Map<String, Object> status = new HashMap<>();
-        status.put("online", online);
-        db.collection("users").document(userId)
-                .update(status)
-                .addOnSuccessListener(aVoid -> Log.d(TAG, "Updated online status to " + online + " for UID: " + userId))
-                .addOnFailureListener(e -> Log.e(TAG, "Failed to update online status: " + e.getMessage()));
     }
 }

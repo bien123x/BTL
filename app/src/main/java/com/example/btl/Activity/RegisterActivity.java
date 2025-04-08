@@ -1,26 +1,23 @@
-package com.example.btl;
+package com.example.btl.Activity;
 
-import android.content.Context;
 import android.content.Intent;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Patterns;
 import android.view.View;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.FirebaseFirestore;
+import com.example.btl.Domain.Model.User;
+import com.example.btl.Domain.Repository.AuthRepository;
+import com.example.btl.Domain.Repository.UserRepository;
+import com.example.btl.Helper.NetworkHelper;
 import com.example.btl.databinding.ActivityRegisterBinding;
-import java.util.HashMap;
-import java.util.Map;
 
 public class RegisterActivity extends AppCompatActivity {
     private ActivityRegisterBinding binding;
-    private FirebaseAuth auth;
-    private FirebaseFirestore db;
+    private AuthRepository authRepository;
+    private UserRepository userRepository;
     private static final String TAG = "RegisterActivity";
 
     @Override
@@ -29,16 +26,9 @@ public class RegisterActivity extends AppCompatActivity {
         binding = ActivityRegisterBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        // Khởi tạo Firebase
-        auth = FirebaseAuth.getInstance();
-        db = FirebaseFirestore.getInstance();
-
-        // Kiểm tra FirebaseAuth
-        if (auth == null) {
-            Log.e(TAG, "FirebaseAuth instance is null");
-            Toast.makeText(this, "Lỗi khởi tạo FirebaseAuth", Toast.LENGTH_LONG).show();
-            return;
-        }
+        // Khởi tạo repository
+        authRepository = new AuthRepository();
+        userRepository = new UserRepository();
 
         // Sự kiện nhấn nút quay lại
         binding.backButton.setOnClickListener(v -> {
@@ -60,7 +50,7 @@ public class RegisterActivity extends AppCompatActivity {
             }
 
             // Kiểm tra kết nối mạng
-            if (!isNetworkAvailable()) {
+            if (!NetworkHelper.isNetworkAvailable(this)) {
                 Toast.makeText(this, "Không có kết nối mạng. Vui lòng kiểm tra lại!", Toast.LENGTH_LONG).show();
                 return;
             }
@@ -126,13 +116,6 @@ public class RegisterActivity extends AppCompatActivity {
         return true;
     }
 
-    // Kiểm tra kết nối mạng
-    private boolean isNetworkAvailable() {
-        ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
-        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
-    }
-
     // Hiển thị/Ẩn loading indicator
     private void showLoading(boolean isLoading) {
         binding.registerButton.setEnabled(!isLoading);
@@ -142,32 +125,26 @@ public class RegisterActivity extends AppCompatActivity {
 
     // Đăng ký người dùng
     private void register(String name, String email, String password) {
-        auth.createUserWithEmailAndPassword(email, password)
+        authRepository.register(email, password)
                 .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
-                        Log.d(TAG, "User registered successfully with email: " + email);
-                        FirebaseUser user = auth.getCurrentUser();
-                        if (user == null) {
-                            Log.e(TAG, "FirebaseUser is null after registration");
-                            Toast.makeText(this, "Đăng ký thất bại: Không thể lấy thông tin người dùng", Toast.LENGTH_LONG).show();
-                            showLoading(false);
-                            return;
-                        }
+                        FirebaseUser firebaseUser = task.getResult();
+                        // Tạo đối tượng User
+                        User user = new User(
+                                firebaseUser.getUid(),
+                                name,
+                                email,
+                                "",
+                                0,
+                                true
+                        );
 
-                        // Lưu dữ liệu người dùng vào Firestore
-                        Map<String, Object> userData = new HashMap<>();
-                        userData.put("name", name);
-                        userData.put("email", email);
-                        userData.put("avatar", "default_avatar.png");
-                        userData.put("score", 0);
-                        userData.put("online", true);
-
-                        db.collection("users").document(user.getUid())
-                                .set(userData)
+                        // Lưu thông tin người dùng vào Firestore
+                        userRepository.saveUser(firebaseUser.getUid(), user)
                                 .addOnCompleteListener(task1 -> {
                                     showLoading(false);
                                     if (task1.isSuccessful()) {
-                                        Log.d(TAG, "User data saved successfully for UID: " + user.getUid());
+                                        Log.d(TAG, "User data saved successfully for UID: " + firebaseUser.getUid());
                                         Toast.makeText(this, "Đăng ký thành công! Vui lòng đăng nhập.", Toast.LENGTH_SHORT).show();
                                         startActivity(new Intent(RegisterActivity.this, LoginActivity.class));
                                         finish();

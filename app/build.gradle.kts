@@ -62,4 +62,7 @@ dependencies {
     // Cảm biến (F9, F10)
     implementation("androidx.core:core:1.12.0") // Hỗ trợ cảm biến gia tốc kế và la bàn
 
+    //  Glide
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
 }
