@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="16dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="8dp"
+    app:cardBackgroundColor="#FFFFFF">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Nút đóng dialog -->
+        <ImageButton
+            android:id="@+id/closeButton"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_gravity="end"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Đóng"
+            android:src="@drawable/ic_close"
+            app:tint="#FF0000"
+            tools:ignore="TouchTargetSizeCheck" />
+
+        <!-- Hình ảnh cổ vật -->
+        <ImageView
+            android:id="@+id/artifactImage"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:scaleType="centerCrop"
+            android:background="@drawable/rounded_image_background"
+            android:contentDescription="Hình ảnh cổ vật"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Tiêu đề cổ vật -->
+        <TextView
+            android:id="@+id/artifactName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tên cổ vật"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#212121"
+            android:layout_gravity="center"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Mô tả -->
+        <TextView
+            android:id="@+id/artifactDescription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mô tả chi tiết về cổ vật sẽ hiển thị ở đây."
+            android:textSize="16sp"
+            android:textColor="#757575"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Độ hiếm -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Độ hiếm: "
+                android:textSize="16sp"
+                android:textColor="#212121" />
+
+            <RatingBar
+                android:id="@+id/artifactRarity"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:numStars="5"
+                android:stepSize="1.0"
+                android:isIndicator="true"
+                android:progressTint="#FFD700"
+                style="?android:attr/ratingBarStyleSmall" />
+        </LinearLayout>
+
+        <!-- Điểm số -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Điểm: "
+                android:textSize="16sp"
+                android:textColor="#212121" />
+
+            <TextView
+                android:id="@+id/artifactPoints"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="100"
+                android:textSize="16sp"
+                android:textColor="#FF6200EE"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Nút thu thập cổ vật -->
+        <Button
+            android:id="@+id/collectButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Thu thập cổ vật"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#FF6200EE"
+            android:layout_gravity="center"
+            app:cornerRadius="8dp" />
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

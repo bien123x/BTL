@@ -7,6 +7,8 @@ public class User {
     private String avatar;
     private long score;
     private boolean online;
+    private double latitude;
+    private double longitude;
 
     public User() {}
 
@@ -66,5 +68,21 @@ public class User {
 
     public void setOnline(boolean online) {
         this.online = online;
+    }
+
+    public double getLatitude() {
+        return latitude;
+    }
+
+    public void setLatitude(double latitude) {
+        this.latitude = latitude;
+    }
+
+    public double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(double longitude) {
+        this.longitude = longitude;
     }
 }
