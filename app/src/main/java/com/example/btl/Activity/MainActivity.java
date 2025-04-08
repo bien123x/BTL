@@ -1,4 +1,4 @@
-package com.example.btl;
+package com.example.btl.Activity;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
@@ -14,6 +14,8 @@ import android.widget.ImageView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+
+import com.example.btl.R;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
