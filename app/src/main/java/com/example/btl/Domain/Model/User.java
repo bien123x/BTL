@@ -1,6 +1,8 @@
 package com.example.btl.Domain.Model;
 
-public class User {
+import java.io.Serializable;
+
+public class User implements Serializable {
     private String id;
     private String name;
     private String email;
@@ -10,8 +12,10 @@ public class User {
     private double latitude;
     private double longitude;
 
+    // Constructor mặc định
     public User() {}
 
+    // Constructor mới với các tham số
     public User(String id, String name, String email, String avatar, long score, boolean online) {
         this.id = id;
         this.name = name;
@@ -19,9 +23,10 @@ public class User {
         this.avatar = avatar;
         this.score = score;
         this.online = online;
+        this.latitude = 0.0;
+        this.longitude = 0.0;
     }
 
-    // Getters và Setters
     public String getId() {
         return id;
     }

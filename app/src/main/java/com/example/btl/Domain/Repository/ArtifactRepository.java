@@ -15,13 +15,12 @@ public class ArtifactRepository {
     private static final String TAG = "ArtifactRepository";
     private final FirebaseFirestore db;
     private static final String ARTIFACTS_COLLECTION = "artifacts";
-    private static final String USERS_COLLECTION = "users";
+    private static final String USER_ARTIFACTS_COLLECTION = "user_artifacts";
 
     public ArtifactRepository() {
         this.db = FirebaseFirestore.getInstance();
     }
 
-    // Lấy danh sách tất cả cổ vật
     public Task<List<Artifact>> getAllArtifacts() {
         return db.collection(ARTIFACTS_COLLECTION)
                 .get()
@@ -33,11 +32,11 @@ public class ArtifactRepository {
                             artifact.setId(document.getId());
                             artifact.setName(document.getString("name"));
                             artifact.setDescription(document.getString("description"));
+                            artifact.setRarity(document.getLong("rarity") != null ? document.getLong("rarity").intValue() : 0);
+                            artifact.setPoints(document.getLong("points") != null ? document.getLong("points").intValue() : 0);
                             artifact.setImageUrl(document.getString("imageUrl"));
                             artifact.setLatitude(document.getDouble("latitude") != null ? document.getDouble("latitude") : 0.0);
                             artifact.setLongitude(document.getDouble("longitude") != null ? document.getDouble("longitude") : 0.0);
-                            artifact.setRarity(document.getLong("rarity") != null ? document.getLong("rarity").intValue() : 0);
-                            artifact.setPoints(document.getLong("points") != null ? document.getLong("points").intValue() : 0);
                             artifacts.add(artifact);
                         }
                         Log.d(TAG, "Loaded " + artifacts.size() + " artifacts");
@@ -49,41 +48,83 @@ public class ArtifactRepository {
                 });
     }
 
-    // Kiểm tra xem người dùng đã thu thập cổ vật chưa
     public Task<Boolean> hasUserCollectedArtifact(String userId, String artifactId) {
-        return db.collection(USERS_COLLECTION).document(userId)
+        return db.collection(USER_ARTIFACTS_COLLECTION)
+                .document(userId)
+                .collection("artifacts")
+                .document(artifactId)
                 .get()
-                .continueWith(task -> {
+                .continueWith(task -> task.isSuccessful() && task.getResult().exists());
+    }
+
+    public Task<Void> collectArtifact(String userId, String artifactId, int points) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("collectedAt", System.currentTimeMillis());
+        data.put("points", points);
+
+        return db.collection(USER_ARTIFACTS_COLLECTION)
+                .document(userId)
+                .collection("artifacts")
+                .document(artifactId)
+                .set(data)
+                .continueWithTask(task -> {
                     if (task.isSuccessful()) {
-                        Map<String, Object> collectedArtifacts = (Map<String, Object>) task.getResult().get("collectedArtifacts");
-                        if (collectedArtifacts != null && collectedArtifacts.containsKey(artifactId)) {
-                            return (Boolean) collectedArtifacts.get(artifactId);
-                        }
-                        return false;
+                        return db.collection("users")
+                                .document(userId)
+                                .update("score", com.google.firebase.firestore.FieldValue.increment(points));
                     } else {
-                        Log.e(TAG, "Failed to check collected artifact: " + task.getException().getMessage());
                         throw task.getException();
                     }
                 });
     }
 
-    // Thu thập cổ vật
-    public Task<Void> collectArtifact(String userId, String artifactId, int points) {
-        Map<String, Object> collectedData = new HashMap<>();
-        collectedData.put("collectedArtifacts." + artifactId, true);
-
-        // Cộng điểm cho người dùng
-        return db.collection(USERS_COLLECTION).document(userId)
-                .update(collectedData)
+    // Thêm phương thức để lấy danh sách vật phẩm đã thu thập của một người dùng
+    public Task<List<Artifact>> getCollectedArtifacts(String userId) {
+        return db.collection(USER_ARTIFACTS_COLLECTION)
+                .document(userId)
+                .collection("artifacts")
+                .get()
                 .continueWithTask(task -> {
-                    if (task.isSuccessful()) {
-                        return db.collection(USERS_COLLECTION).document(userId)
-                                .update("score", com.google.firebase.firestore.FieldValue.increment(points));
-                    } else {
+                    if (!task.isSuccessful()) {
+                        Log.e(TAG, "Failed to load collected artifact IDs: " + task.getException().getMessage());
                         throw task.getException();
                     }
-                })
-                .addOnSuccessListener(aVoid -> Log.d(TAG, "Artifact " + artifactId + " collected by user " + userId))
-                .addOnFailureListener(e -> Log.e(TAG, "Failed to collect artifact: " + e.getMessage()));
+
+                    List<String> artifactIds = new ArrayList<>();
+                    for (QueryDocumentSnapshot doc : task.getResult()) {
+                        artifactIds.add(doc.getId());
+                    }
+
+                    if (artifactIds.isEmpty()) {
+                        return Tasks.forResult(new ArrayList<>());
+                    }
+
+                    // Lấy thông tin chi tiết của các vật phẩm
+                    return db.collection(ARTIFACTS_COLLECTION)
+                            .whereIn("id", artifactIds)
+                            .get()
+                            .continueWith(innerTask -> {
+                                if (innerTask.isSuccessful()) {
+                                    List<Artifact> artifacts = new ArrayList<>();
+                                    for (QueryDocumentSnapshot document : innerTask.getResult()) {
+                                        Artifact artifact = new Artifact();
+                                        artifact.setId(document.getId());
+                                        artifact.setName(document.getString("name"));
+                                        artifact.setDescription(document.getString("description"));
+                                        artifact.setRarity(document.getLong("rarity") != null ? document.getLong("rarity").intValue() : 0);
+                                        artifact.setPoints(document.getLong("points") != null ? document.getLong("points").intValue() : 0);
+                                        artifact.setImageUrl(document.getString("imageUrl"));
+                                        artifact.setLatitude(document.getDouble("latitude") != null ? document.getDouble("latitude") : 0.0);
+                                        artifact.setLongitude(document.getDouble("longitude") != null ? document.getDouble("longitude") : 0.0);
+                                        artifacts.add(artifact);
+                                    }
+                                    Log.d(TAG, "Loaded " + artifacts.size() + " collected artifacts for user " + userId);
+                                    return artifacts;
+                                } else {
+                                    Log.e(TAG, "Failed to load artifact details: " + innerTask.getException().getMessage());
+                                    throw innerTask.getException();
+                                }
+                            });
+                });
     }
 }

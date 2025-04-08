@@ -4,6 +4,9 @@ import android.Manifest;
 import android.app.Dialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -19,6 +22,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import com.bumptech.glide.Glide;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
@@ -31,6 +35,7 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
@@ -45,11 +50,6 @@ import com.example.btl.databinding.DialogArtifactInfoBinding;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.drawable.Drawable;
-import androidx.core.content.ContextCompat;
-import com.google.android.gms.maps.model.BitmapDescriptor;
 
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, SensorEventListener, GoogleMap.OnMarkerClickListener {
     private GoogleMap mMap;
@@ -158,6 +158,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             startActivity(new Intent(MainActivity.this, MessageListActivity.class));
         });
 
+        // Xử lý nhấn vào avatar để mở MyProfileActivity
+        userAvatar.setOnClickListener(v -> {
+            startActivity(new Intent(MainActivity.this, MyProfileActivity.class));
+        });
+
         checkLocationPermission();
 
         // Cập nhật trạng thái online của người dùng hiện tại
@@ -178,18 +183,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         return true;
     }
 
-    // xử lí hình ảnh , icon xml mà gg map api ko tương thích
-    private BitmapDescriptor getBitmapDescriptorFromVector(int vectorResId) {
-        Drawable vectorDrawable = ContextCompat.getDrawable(this, vectorResId);
-        if (vectorDrawable == null) {
-            return null;
-        }
-        vectorDrawable.setBounds(0, 0, vectorDrawable.getIntrinsicWidth(), vectorDrawable.getIntrinsicHeight());
-        Bitmap bitmap = Bitmap.createBitmap(vectorDrawable.getIntrinsicWidth(), vectorDrawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        vectorDrawable.draw(canvas);
-        return BitmapDescriptorFactory.fromBitmap(bitmap);
-    }
     private void loadUserInfo() {
         String userId = authRepository.getCurrentUser().getUid();
         userRepository.getUser(userId)
@@ -307,7 +300,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
         User user = userMap.get(marker.getId());
         if (user != null) {
-            Toast.makeText(this, "Người chơi: " + user.getName(), Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(MainActivity.this, UserProfileActivity.class);
+            intent.putExtra("user", user);
+            startActivity(intent);
             return true;
         }
         return false;
@@ -500,6 +495,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {}
 
+    private BitmapDescriptor getBitmapDescriptorFromVector(int vectorResId) {
+        Drawable vectorDrawable = ContextCompat.getDrawable(this, vectorResId);
+        if (vectorDrawable == null) {
+            return null;
+        }
+        vectorDrawable.setBounds(0, 0, vectorDrawable.getIntrinsicWidth(), vectorDrawable.getIntrinsicHeight());
+        Bitmap bitmap = Bitmap.createBitmap(vectorDrawable.getIntrinsicWidth(), vectorDrawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        vectorDrawable.draw(canvas);
+        return BitmapDescriptorFactory.fromBitmap(bitmap);
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -509,6 +516,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             startLocationUpdates();
         }
         updateOnlineStatus(true);
+        loadUserInfo(); // Cập nhật thông tin người dùng khi quay lại MainActivity
     }
 
     @Override

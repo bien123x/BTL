@@ -134,7 +134,7 @@ public class RegisterActivity extends AppCompatActivity {
                                 firebaseUser.getUid(),
                                 name,
                                 email,
-                                "default_avatar.png",
+                                "",
                                 0,
                                 true
                         );

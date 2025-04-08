@@ -1,5 +1,6 @@
 package com.example.btl.Activity;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import androidx.appcompat.app.AppCompatActivity;
@@ -41,8 +42,10 @@ public class MessageListActivity extends AppCompatActivity {
         // Thiết lập RecyclerView
         messageListRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         adapter = new MessageUserAdapter(userList, user -> {
-            // Xử lý khi nhấn vào một người dùng (có thể mở chat activity)
-            Log.d(TAG, "Clicked on user: " + user.getName());
+            // Mở ChatActivity khi nhấn vào một người dùng
+            Intent intent = new Intent(MessageListActivity.this, ChatActivity.class);
+            intent.putExtra("otherUser", user);
+            startActivity(intent);
         });
         messageListRecyclerView.setAdapter(adapter);
 
@@ -54,7 +57,7 @@ public class MessageListActivity extends AppCompatActivity {
         String currentUserId = authRepository.getCurrentUser().getUid();
 
         // Lấy danh sách các cuộc trò chuyện mà người dùng hiện tại tham gia
-        db.collection("messages")
+        db.collection("conversations")
                 .whereArrayContains("participants", currentUserId)
                 .get()
                 .addOnCompleteListener(task -> {
