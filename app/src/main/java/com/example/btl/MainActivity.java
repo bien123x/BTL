@@ -2,15 +2,11 @@ package com.example.btl;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.os.Looper;
 import android.view.View;
 import android.widget.Button;
-import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -24,31 +20,70 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.firebase.firestore.FirebaseFirestore;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, SensorEventListener {
+public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
+
     private GoogleMap mMap;
-    private Button menuButton, profileButton;
-    private SensorManager sensorManager;
-    private Sensor accelerometer;
-    private Sensor magnetometer;
-    private FirebaseFirestore db;
     private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
-    private float[] gravity = new float[3];
-    private float[] geomagnetic = new float[3];
-    private float azimuth = 0f;
-    private ImageView compassArrow;
+    private LatLng userLocation; // Vị trí hiện tại của người chơi
+    private TextView scoreTextView; // Hiển thị điểm số
+    private Button collectButton; // Nút để thu thập cổ vật
+    private int playerScore = 0; // Điểm số của người chơi
+
+    // Danh sách cổ vật
+    private List<Artifact> artifacts = new ArrayList<>();
+    private Map<Marker, Artifact> markerToArtifactMap = new HashMap<>(); // Liên kết marker với cổ vật
+
+    // Lớp Artifact để lưu thông tin cổ vật
+    private static class Artifact {
+        LatLng location;
+        String name;
+        String rarity; // Độ hiếm: Thường, Hiếm, Huyền Thoại
+        int points; // Điểm số
+        boolean isCollected; // Trạng thái đã thu thập hay chưa
+
+        Artifact(LatLng location, String name, String rarity, int points) {
+            this.location = location;
+            this.name = name;
+            this.rarity = rarity;
+            this.points = points;
+            this.isCollected = false;
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        menuButton = findViewById(R.id.menuButton);
-        profileButton = findViewById(R.id.profileButton);
-        compassArrow = findViewById(R.id.compassArrow);
+        // Khởi tạo giao diện
+        scoreTextView = findViewById(R.id.scoreTextView);
+        collectButton = findViewById(R.id.collectButton);
+        scoreTextView.setText("Điểm: " + playerScore);
+
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+
+        // Khởi tạo LocationCallback để theo dõi vị trí người chơi
+        locationCallback = new LocationCallback() {
+            @Override
+            public void onLocationResult(LocationResult locationResult) {
+                if (locationResult == null) {
+                    return;
+                }
+                for (android.location.Location location : locationResult.getLocations()) {
+                    userLocation = new LatLng(location.getLatitude(), location.getLongitude());
+                    // Kiểm tra khoảng cách đến các cổ vật
+                    checkProximityToArtifacts();
+                }
+            }
+        };
 
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         if (mapFragment != null) {
@@ -57,55 +92,22 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             Toast.makeText(this, "Không thể khởi tạo bản đồ", Toast.LENGTH_LONG).show();
         }
 
-        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
-        db = FirebaseFirestore.getInstance();
-
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-        locationCallback = new LocationCallback() {
-            @Override
-            public void onLocationResult(LocationResult locationResult) {
-                if (locationResult == null) {
-                    return;
-                }
-                for (android.location.Location location : locationResult.getLocations()) {
-                    LatLng userLocation = new LatLng(location.getLatitude(), location.getLongitude());
-                    mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation, 15f));
-//                    Toast.makeText(MainActivity.this, "Vị trí: " + userLocation.toString(), Toast.LENGTH_SHORT).show();
-                }
-            }
-        };
-
-        menuButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Toast.makeText(MainActivity.this, "Menu clicked", Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        profileButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Toast.makeText(MainActivity.this, "Profile clicked", Toast.LENGTH_SHORT).show();
-            }
-        });
-
         checkLocationPermission();
+
+        // Xử lý sự kiện khi nhấn nút thu thập
+        collectButton.setOnClickListener(v -> collectNearbyArtifact());
     }
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
-        if (googleMap == null) {
-            Toast.makeText(this, "Không thể tải bản đồ", Toast.LENGTH_LONG).show();
-            return;
-        }
-
         mMap = googleMap;
 
-        LatLng artifactLocation = new LatLng(10.7769, 106.7009);
-        mMap.addMarker(new MarkerOptions().position(artifactLocation).title("Cổ vật 1"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(artifactLocation, 15f));
+        // Đặt vị trí mặc định cho camera
+        LatLng defaultLocation = new LatLng(10.7769, 106.7009);
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(defaultLocation, 15f));
+
+        // Thêm các cổ vật vào bản đồ
+        initializeArtifacts();
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             mMap.setMyLocationEnabled(true);
@@ -115,8 +117,83 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
+    private void initializeArtifacts() {
+        // Thêm các cổ vật (tọa độ, tên, độ hiếm, điểm số)
+        artifacts.add(new Artifact(new LatLng(10.7769, 106.7009), "Bình gốm cổ", "Thường", 10));
+        artifacts.add(new Artifact(new LatLng(10.7800, 106.7100), "Kiếm đồng", "Hiếm", 50));
+        artifacts.add(new Artifact(new LatLng(10.7700, 106.6900), "Vương miện vàng", "Huyền Thoại", 100));
+
+        // Hiển thị các cổ vật trên bản đồ
+        for (Artifact artifact : artifacts) {
+            Marker marker = mMap.addMarker(new MarkerOptions()
+                    .position(artifact.location)
+                    .title(artifact.name)
+                    .snippet("Độ hiếm: " + artifact.rarity + " | Điểm: " + artifact.points));
+            markerToArtifactMap.put(marker, artifact);
+        }
+    }
+
+    private void checkProximityToArtifacts() {
+        if (userLocation == null) return;
+
+        boolean nearArtifact = false;
+        for (Artifact artifact : artifacts) {
+            if (artifact.isCollected) continue; // Bỏ qua cổ vật đã thu thập
+
+            float distance = calculateDistance(userLocation, artifact.location);
+            if (distance < 10) { // Khoảng cách < 10 mét
+                nearArtifact = true;
+                break;
+            }
+        }
+
+        // Hiển thị hoặc ẩn nút thu thập dựa trên khoảng cách
+        collectButton.setVisibility(nearArtifact ? View.VISIBLE : View.GONE);
+    }
+
+    private void collectNearbyArtifact() {
+        if (userLocation == null) return;
+
+        for (Artifact artifact : artifacts) {
+            if (artifact.isCollected) continue;
+
+            float distance = calculateDistance(userLocation, artifact.location);
+            if (distance < 10) { // Khoảng cách < 10 mét
+                artifact.isCollected = true;
+                playerScore += artifact.points;
+                scoreTextView.setText("Điểm: " + playerScore);
+                Toast.makeText(this, "Đã thu thập: " + artifact.name + " (" + artifact.rarity + ")! +" + artifact.points + " điểm", Toast.LENGTH_LONG).show();
+
+                // Xóa marker của cổ vật đã thu thập
+                for (Map.Entry<Marker, Artifact> entry : markerToArtifactMap.entrySet()) {
+                    if (entry.getValue() == artifact) {
+                        entry.getKey().remove();
+                        markerToArtifactMap.remove(entry.getKey());
+                        break;
+                    }
+                }
+                break; // Chỉ thu thập một cổ vật gần nhất
+            }
+        }
+
+        // Kiểm tra lại khoảng cách sau khi thu thập
+        checkProximityToArtifacts();
+    }
+
+    private float calculateDistance(LatLng point1, LatLng point2) {
+        float[] results = new float[1];
+        android.location.Location.distanceBetween(
+                point1.latitude, point1.longitude,
+                point2.latitude, point2.longitude,
+                results);
+        return results[0];
+    }
+
     private void checkLocationPermission() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
+                Toast.makeText(this, "Ứng dụng cần quyền định vị để hiển thị vị trí của bạn trên bản đồ", Toast.LENGTH_LONG).show();
+            }
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
         }
     }
@@ -136,8 +213,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private void startLocationUpdates() {
         LocationRequest locationRequest = LocationRequest.create();
-        locationRequest.setInterval(5000);
-        locationRequest.setFastestInterval(2000);
+        locationRequest.setInterval(5000); // Cập nhật mỗi 5 giây
+        locationRequest.setFastestInterval(2000); // Nhanh nhất là 2 giây
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
@@ -146,50 +223,16 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     @Override
-    public void onSensorChanged(SensorEvent event) {
-
-        if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-            gravity = event.values.clone();
-            float x = event.values[0];
-            if (x > 5) {
-                Toast.makeText(this, "Bạn đang chạy!", Toast.LENGTH_SHORT).show();
-            }
-        } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
-            geomagnetic = event.values.clone();
-        }
-
-        if (gravity != null && geomagnetic != null) {
-            float[] R = new float[9];
-            float[] I = new float[9];
-            boolean success = SensorManager.getRotationMatrix(R, I, gravity, geomagnetic);
-            if (success) {
-                float[] orientation = new float[3];
-                SensorManager.getOrientation(R, orientation);
-                azimuth = (float) Math.toDegrees(orientation[0]);
-                azimuth = (azimuth + 360) % 360;
-                compassArrow.setRotation(azimuth);
-//                Toast.makeText(this, "Hướng: " + azimuth + " độ", Toast.LENGTH_SHORT).show();
-            }
-        }
+    protected void onPause() {
+        super.onPause();
+        fusedLocationClient.removeLocationUpdates(locationCallback);
     }
-
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {}
 
     @Override
     protected void onResume() {
         super.onResume();
-        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
-        sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_NORMAL);
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             startLocationUpdates();
         }
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        sensorManager.unregisterListener(this);
-        fusedLocationClient.removeLocationUpdates(locationCallback);
     }
 }
