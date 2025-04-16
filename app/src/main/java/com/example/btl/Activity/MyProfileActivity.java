@@ -22,6 +22,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.bumptech.glide.Glide;
+import com.cloudinary.android.MediaManager;
+import com.cloudinary.android.callback.ErrorInfo;
+import com.cloudinary.android.callback.UploadCallback;
 import com.example.btl.Adapter.CollectedArtifactAdapter;
 import com.example.btl.Domain.Model.Artifact;
 import com.example.btl.Domain.Model.User;
@@ -29,13 +32,10 @@ import com.example.btl.Domain.Repository.ArtifactRepository;
 import com.example.btl.Domain.Repository.AuthRepository;
 import com.example.btl.Domain.Repository.UserRepository;
 import com.example.btl.R;
-import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 public class MyProfileActivity extends AppCompatActivity {
     private static final String TAG = "MyProfileActivity";
@@ -46,13 +46,12 @@ public class MyProfileActivity extends AppCompatActivity {
     private TextView userScore;
     private GridView collectedItemsGrid;
     private ImageView backButton;
-    private ImageView editButton;
+    private ImageButton editButton;
     private User currentUser;
     private AuthRepository authRepository;
     private UserRepository userRepository;
     private ArtifactRepository artifactRepository;
     private List<Artifact> collectedArtifacts;
-    private FirebaseStorage storage;
     private Uri selectedImageUri;
     private ImageView avatarPreview;
 
@@ -88,7 +87,6 @@ public class MyProfileActivity extends AppCompatActivity {
         authRepository = new AuthRepository();
         userRepository = new UserRepository();
         artifactRepository = new ArtifactRepository();
-        storage = FirebaseStorage.getInstance();
         collectedArtifacts = new ArrayList<>();
 
         // Lấy thông tin người dùng hiện tại
@@ -195,7 +193,7 @@ public class MyProfileActivity extends AppCompatActivity {
             updates.put("name", newName);
 
             if (selectedImageUri != null) {
-                uploadImageToFirebaseStorage(selectedImageUri, newName, dialog);
+                uploadImageToCloudinary(selectedImageUri, newName, dialog);
             } else {
                 updates.put("avatar", currentUser.getAvatar() != null ? currentUser.getAvatar() : "");
                 updateUserInfo(updates, newName, dialog);
@@ -205,59 +203,45 @@ public class MyProfileActivity extends AppCompatActivity {
         dialog.show();
     }
 
-    private boolean checkStoragePermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Android 13 trở lên
-            return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED;
-        } else {
-            // Android 12 trở xuống
-            return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
-        }
-    }
-
-    private void requestStoragePermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_MEDIA_IMAGES}, STORAGE_PERMISSION_CODE);
-        } else {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, STORAGE_PERMISSION_CODE);
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == STORAGE_PERMISSION_CODE) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "Quyền truy cập bộ nhớ đã được cấp", Toast.LENGTH_SHORT).show();
-                Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-                pickImageLauncher.launch(intent);
-            } else {
-                Toast.makeText(this, "Ứng dụng cần quyền truy cập bộ nhớ để chọn ảnh", Toast.LENGTH_LONG).show();
-            }
-        }
-    }
-
-    private void uploadImageToFirebaseStorage(Uri imageUri, String newName, Dialog dialog) {
+    private void uploadImageToCloudinary(Uri imageUri, String newName, Dialog dialog) {
         String userId = authRepository.getCurrentUser().getUid();
-        StorageReference storageRef = storage.getReference().child("avatars/" + userId + "/" + UUID.randomUUID().toString() + ".jpg");
 
-        storageRef.putFile(imageUri)
-                .addOnSuccessListener(taskSnapshot -> {
-                    storageRef.getDownloadUrl().addOnSuccessListener(uri -> {
-                        String imageUrl = uri.toString();
+        MediaManager.get().upload(imageUri) // Truyền trực tiếp Uri
+                .unsigned("covat-upload") // Upload preset của bạn
+                .option("folder", "avatars/" + userId)
+                .callback(new UploadCallback() {
+                    @Override
+                    public void onStart(String requestId) {
+                        Log.d(TAG, "Upload started: " + requestId);
+                    }
+
+                    @Override
+                    public void onProgress(String requestId, long bytes, long totalBytes) {
+                        Log.d(TAG, "Uploading: " + bytes + "/" + totalBytes);
+                    }
+
+                    @Override
+                    public void onSuccess(String requestId, Map resultData) {
+                        String imageUrl = resultData.get("secure_url").toString();
+                        Log.d(TAG, "Upload success, URL: " + imageUrl);
                         Map<String, Object> updates = new HashMap<>();
                         updates.put("name", newName);
                         updates.put("avatar", imageUrl);
                         updateUserInfo(updates, newName, dialog);
-                    }).addOnFailureListener(e -> {
-                        Toast.makeText(this, "Không thể lấy URL ảnh: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                        Log.e(TAG, "Failed to get download URL: " + e.getMessage());
-                    });
+                    }
+
+                    @Override
+                    public void onError(String requestId, ErrorInfo error) {
+                        Toast.makeText(MyProfileActivity.this, "Tải ảnh lên thất bại: " + error.getDescription(), Toast.LENGTH_SHORT).show();
+                        Log.e(TAG, "Upload error: " + error.getDescription());
+                    }
+
+                    @Override
+                    public void onReschedule(String requestId, ErrorInfo error) {
+                        Log.d(TAG, "Upload rescheduled: " + error.getDescription());
+                    }
                 })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Tải ảnh lên thất bại: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    Log.e(TAG, "Failed to upload image: " + e.getMessage());
-                });
+                .dispatch(this); // Truyền context
     }
 
     private void updateUserInfo(Map<String, Object> updates, String newName, Dialog dialog) {
@@ -284,5 +268,35 @@ public class MyProfileActivity extends AppCompatActivity {
                         Log.e(TAG, "Failed to update user info: " + task.getException().getMessage());
                     }
                 });
+    }
+
+    private boolean checkStoragePermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED;
+        } else {
+            return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+        }
+    }
+
+    private void requestStoragePermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_MEDIA_IMAGES}, STORAGE_PERMISSION_CODE);
+        } else {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, STORAGE_PERMISSION_CODE);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == STORAGE_PERMISSION_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "Quyền truy cập bộ nhớ đã được cấp", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+                pickImageLauncher.launch(intent);
+            } else {
+                Toast.makeText(this, "Ứng dụng cần quyền truy cập bộ nhớ để chọn ảnh", Toast.LENGTH_LONG).show();
+            }
+        }
     }
 }

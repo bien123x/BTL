@@ -65,4 +65,6 @@ dependencies {
     //  Glide
     implementation("com.github.bumptech.glide:glide:4.16.0")
     annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
+
+    implementation ("com.cloudinary:cloudinary-android:2.2.0")
 }

@@ -24,6 +24,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -40,16 +41,21 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.example.btl.Helper.CloudinaryConfig;
 import com.example.btl.Domain.Model.Artifact;
+import com.example.btl.Domain.Model.ArtifactSample;
 import com.example.btl.Domain.Model.User;
 import com.example.btl.Domain.Repository.ArtifactRepository;
 import com.example.btl.Domain.Repository.AuthRepository;
 import com.example.btl.Domain.Repository.UserRepository;
 import com.example.btl.R;
 import com.example.btl.databinding.DialogArtifactInfoBinding;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.UUID;
 
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, SensorEventListener, GoogleMap.OnMarkerClickListener {
     private GoogleMap mMap;
@@ -72,6 +78,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private static final float COLLECT_DISTANCE_THRESHOLD = 50f;
     private static final int PLAY_SERVICES_RESOLUTION_REQUEST = 9000;
 
+    private Map<String, Marker> markerMap; // Thêm map để lưu Marker
     private ImageView compassArrow;
     private Button collectButton;
     private ImageView userAvatar;
@@ -83,6 +90,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // Khởi tạo Cloudinary
+        CloudinaryConfig.init(getApplicationContext());
 
         // Ánh xạ các view
         compassArrow = findViewById(R.id.compassArrow);
@@ -98,6 +108,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         artifactRepository = new ArtifactRepository();
         artifactMap = new HashMap<>();
         userMap = new HashMap<>();
+        markerMap = new HashMap<>(); // Khởi tạo markerMap
 
         // Kiểm tra đăng nhập
         if (authRepository.getCurrentUser() == null) {
@@ -143,6 +154,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     }
                     updateCollectButtonState();
                     updateUserLocationInFirestore(location.getLatitude(), location.getLongitude());
+                    // Tạo cổ vật ngẫu nhiên khi có vị trí người chơi
+                    if (artifactMap.isEmpty()) {
+                        generateRandomArtifacts();
+                    }
                 }
             }
         };
@@ -242,30 +257,49 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             Log.w(TAG, "Location permission not granted");
         }
 
-        loadArtifacts();
         loadOtherUsers();
     }
 
-    private void loadArtifacts() {
-        artifactRepository.getAllArtifacts()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        List<Artifact> artifacts = task.getResult();
-                        for (Artifact artifact : artifacts) {
-                            LatLng location = new LatLng(artifact.getLatitude(), artifact.getLongitude());
-                            Marker marker = mMap.addMarker(new MarkerOptions()
-                                    .position(location)
-                                    .title(artifact.getName())
-                                    .icon(getBitmapDescriptorFromVector(R.drawable.star_icon)));
-                            artifactMap.put(marker.getId(), artifact);
-                        }
-                    } else {
-                        Log.e(TAG, "Failed to load artifacts: " + task.getException().getMessage());
-                        Toast.makeText(this, "Không thể tải danh sách cổ vật", Toast.LENGTH_SHORT).show();
-                    }
-                });
-    }
+    private void generateRandomArtifacts() {
+        if (currentUserLocation == null) return;
 
+        // Lấy danh sách cổ vật mẫu
+        List<ArtifactSample> samples = ArtifactSample.getSampleArtifacts();
+        Random random = new Random();
+
+        // Tạo 5 cổ vật ngẫu nhiên
+        for (int i = 0; i < 5; i++) {
+            // Chọn ngẫu nhiên một cổ vật mẫu
+            ArtifactSample sample = samples.get(random.nextInt(samples.size()));
+
+            // Sinh tọa độ ngẫu nhiên trong bán kính 500m quanh người chơi
+            double radiusInDegrees = 500.0 / 111320.0; // 500m chuyển sang độ (1 độ ~ 111320m)
+            double latOffset = (random.nextDouble() * 2 - 1) * radiusInDegrees;
+            double lngOffset = (random.nextDouble() * 2 - 1) * radiusInDegrees * Math.cos(Math.toRadians(currentUserLocation.latitude));
+            double randomLat = currentUserLocation.latitude + latOffset;
+            double randomLng = currentUserLocation.longitude + lngOffset;
+
+            // Tạo cổ vật mới
+            Artifact artifact = new Artifact();
+            artifact.setId(UUID.randomUUID().toString());
+            artifact.setName(sample.getName());
+            artifact.setDescription(sample.getDescription());
+            artifact.setImageUrl(sample.getImageUrl());
+            artifact.setLatitude(randomLat);
+            artifact.setLongitude(randomLng);
+            artifact.setRarity(sample.getRarity());
+            artifact.setPoints(sample.getPoints());
+
+            // Thêm vào bản đồ
+            LatLng location = new LatLng(artifact.getLatitude(), artifact.getLongitude());
+            Marker marker = mMap.addMarker(new MarkerOptions()
+                    .position(location)
+                    .title(artifact.getName())
+                    .icon(getBitmapDescriptorFromVector(R.drawable.star_icon)));
+            artifactMap.put(marker.getId(), artifact);
+            markerMap.put(marker.getId(), marker); // Lưu marker vào markerMap
+        }
+    }
     private void loadOtherUsers() {
         userRepository.getOnlineUsers()
                 .addOnCompleteListener(task -> {
@@ -295,7 +329,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     public boolean onMarkerClick(Marker marker) {
         Artifact artifact = artifactMap.get(marker.getId());
         if (artifact != null) {
-            showArtifactDialog(artifact);
+            showArtifactDialog(artifact, marker); // Truyền cả marker vào
             return true;
         }
         User user = userMap.get(marker.getId());
@@ -308,7 +342,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         return false;
     }
 
-    private void showArtifactDialog(Artifact artifact) {
+    private void showArtifactDialog(Artifact artifact, Marker marker) { // Thêm tham số Marker
         Dialog dialog = new Dialog(this);
         DialogArtifactInfoBinding binding = DialogArtifactInfoBinding.inflate(getLayoutInflater());
         dialog.setContentView(binding.getRoot());
@@ -322,6 +356,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             Glide.with(this)
                     .load(artifact.getImageUrl())
                     .placeholder(R.drawable.placeholder_image)
+                    .error(R.drawable.error_image)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .into(binding.artifactImage);
         } else {
             binding.artifactImage.setImageResource(R.drawable.placeholder_image);
@@ -346,6 +382,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                                                 binding.collectButton.setEnabled(false);
                                                 binding.collectButton.setBackgroundTintList(getResources().getColorStateList(android.R.color.darker_gray));
                                                 loadUserInfo();
+                                                // Xóa marker sau khi thu thập
+                                                marker.remove();
+                                                artifactMap.remove(marker.getId());
+                                                // Tạo lại cổ vật mới
+                                                generateRandomArtifacts();
                                             } else {
                                                 Toast.makeText(this, "Không thể thu thập cổ vật: " + collectTask.getException().getMessage(), Toast.LENGTH_LONG).show();
                                             }
@@ -392,7 +433,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         Artifact nearestArtifact = null;
         float minDistance = Float.MAX_VALUE;
-        for (Artifact artifact : artifactMap.values()) {
+        String nearestMarkerId = null;
+
+        for (Map.Entry<String, Artifact> entry : artifactMap.entrySet()) {
+            Artifact artifact = entry.getValue();
             LatLng artifactLocation = new LatLng(artifact.getLatitude(), artifact.getLongitude());
             float[] results = new float[1];
             android.location.Location.distanceBetween(
@@ -403,15 +447,19 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             if (distance <= COLLECT_DISTANCE_THRESHOLD && distance < minDistance) {
                 minDistance = distance;
                 nearestArtifact = artifact;
+                nearestMarkerId = entry.getKey(); // Lấy markerId tương ứng
             }
         }
 
-        if (nearestArtifact != null) {
-            handleArtifactCollection(nearestArtifact);
+        if (nearestArtifact != null && nearestMarkerId != null) {
+            Marker nearestMarker = markerMap.get(nearestMarkerId);
+            if (nearestMarker != null) {
+                handleArtifactCollection(nearestArtifact, nearestMarker);
+            }
         }
     }
 
-    private void handleArtifactCollection(Artifact artifact) {
+    private void handleArtifactCollection(Artifact artifact, Marker marker) {
         String userId = authRepository.getCurrentUser().getUid();
         artifactRepository.hasUserCollectedArtifact(userId, artifact.getId())
                 .addOnCompleteListener(task -> {
@@ -422,6 +470,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                                         Toast.makeText(this, "Thu thập thành công! Bạn nhận được " + artifact.getPoints() + " điểm", Toast.LENGTH_SHORT).show();
                                         loadUserInfo();
                                         updateCollectButtonState();
+                                        // Xóa marker sau khi thu thập
+                                        marker.remove();
+                                        artifactMap.remove(marker.getId());
+                                        markerMap.remove(marker.getId()); // Xóa khỏi markerMap
+                                        // Tạo lại cổ vật mới
+                                        generateRandomArtifacts();
                                     } else {
                                         Toast.makeText(this, "Không thể thu thập cổ vật: " + collectTask.getException().getMessage(), Toast.LENGTH_LONG).show();
                                     }
@@ -516,7 +570,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             startLocationUpdates();
         }
         updateOnlineStatus(true);
-        loadUserInfo(); // Cập nhật thông tin người dùng khi quay lại MainActivity
+        loadUserInfo();
     }
 
     @Override
