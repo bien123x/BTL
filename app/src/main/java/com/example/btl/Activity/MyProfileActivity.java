@@ -206,8 +206,8 @@ public class MyProfileActivity extends AppCompatActivity {
     private void uploadImageToCloudinary(Uri imageUri, String newName, Dialog dialog) {
         String userId = authRepository.getCurrentUser().getUid();
 
-        MediaManager.get().upload(imageUri) // Truyền trực tiếp Uri
-                .unsigned("covat-upload") // Upload preset của bạn
+        MediaManager.get().upload(imageUri)
+                .unsigned("covat-upload")
                 .option("folder", "avatars/" + userId)
                 .callback(new UploadCallback() {
                     @Override
@@ -232,8 +232,12 @@ public class MyProfileActivity extends AppCompatActivity {
 
                     @Override
                     public void onError(String requestId, ErrorInfo error) {
-                        Toast.makeText(MyProfileActivity.this, "Tải ảnh lên thất bại: " + error.getDescription(), Toast.LENGTH_SHORT).show();
                         Log.e(TAG, "Upload error: " + error.getDescription());
+                        Map<String, Object> updates = new HashMap<>();
+                        updates.put("name", newName);
+                        updates.put("avatar", currentUser.getAvatar() != null ? currentUser.getAvatar() : "");
+                        updateUserInfo(updates, newName, dialog);
+                        runOnUiThread(() -> Toast.makeText(MyProfileActivity.this, "Tải ảnh lên thất bại: " + error.getDescription(), Toast.LENGTH_SHORT).show());
                     }
 
                     @Override
@@ -241,7 +245,7 @@ public class MyProfileActivity extends AppCompatActivity {
                         Log.d(TAG, "Upload rescheduled: " + error.getDescription());
                     }
                 })
-                .dispatch(this); // Truyền context
+                .dispatch(this);
     }
 
     private void updateUserInfo(Map<String, Object> updates, String newName, Dialog dialog) {
@@ -249,24 +253,36 @@ public class MyProfileActivity extends AppCompatActivity {
         userRepository.updateUser(userId, updates)
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {
-                        Toast.makeText(this, "Cập nhật thông tin thành công", Toast.LENGTH_SHORT).show();
-                        currentUser.setName(newName);
-                        currentUser.setAvatar(updates.get("avatar").toString());
-                        userName.setText(newName);
-                        if (currentUser.getAvatar() != null && !currentUser.getAvatar().isEmpty()) {
-                            Glide.with(this)
-                                    .load(currentUser.getAvatar())
-                                    .placeholder(R.drawable.default_avatar)
-                                    .into(userAvatar);
-                        } else {
-                            userAvatar.setImageResource(R.drawable.default_avatar);
-                        }
-                        selectedImageUri = null;
-                        dialog.dismiss();
+                        runOnUiThread(() -> {
+                            Toast.makeText(this, "Cập nhật thông tin thành công", Toast.LENGTH_SHORT).show();
+                            currentUser.setName(newName);
+                            currentUser.setAvatar(updates.get("avatar").toString());
+                            userName.setText(newName);
+                            if (currentUser.getAvatar() != null && !currentUser.getAvatar().isEmpty()) {
+                                Glide.with(this)
+                                        .load(currentUser.getAvatar())
+                                        .placeholder(R.drawable.default_avatar)
+                                        .into(userAvatar);
+                            } else {
+                                userAvatar.setImageResource(R.drawable.default_avatar);
+                            }
+                            selectedImageUri = null;
+                            dialog.dismiss();
+                        });
                     } else {
-                        Toast.makeText(this, "Cập nhật thất bại: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
-                        Log.e(TAG, "Failed to update user info: " + task.getException().getMessage());
+                        runOnUiThread(() -> {
+                            Toast.makeText(this, "Cập nhật thất bại: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                            Log.e(TAG, "Failed to update user info: " + task.getException().getMessage());
+                            dialog.dismiss();
+                        });
                     }
+                })
+                .addOnFailureListener(e -> {
+                    runOnUiThread(() -> {
+                        Toast.makeText(this, "Lỗi: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        Log.e(TAG, "Update user failed: " + e.getMessage());
+                        dialog.dismiss();
+                    });
                 });
     }
 
