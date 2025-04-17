@@ -32,9 +32,11 @@ import com.example.btl.Domain.Repository.ArtifactRepository;
 import com.example.btl.Domain.Repository.AuthRepository;
 import com.example.btl.Domain.Repository.UserRepository;
 import com.example.btl.R;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class MyProfileActivity extends AppCompatActivity {
@@ -72,16 +74,30 @@ public class MyProfileActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_my_profile);
+        try {
+            setContentView(R.layout.activity_my_profile);
+        } catch (Exception e) {
+            Log.e(TAG, "Error inflating layout: " + e.getMessage(), e);
+            Toast.makeText(this, "Không thể tải giao diện. Vui lòng thử lại.", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
 
         // Ánh xạ các view
-        userAvatar = findViewById(R.id.userAvatar);
-        userName = findViewById(R.id.userName);
-        collectedItemsCount = findViewById(R.id.collectedItemsCount);
-        userScore = findViewById(R.id.userScore);
-        collectedItemsGrid = findViewById(R.id.collectedItemsGrid);
-        backButton = findViewById(R.id.backButton);
-        editButton = findViewById(R.id.editButton);
+        try {
+            userAvatar = findViewById(R.id.userAvatar);
+            userName = findViewById(R.id.userName);
+            collectedItemsCount = findViewById(R.id.collectedItemsCount);
+            userScore = findViewById(R.id.userScore);
+            collectedItemsGrid = findViewById(R.id.collectedItemsGrid);
+            backButton = findViewById(R.id.backButton);
+            editButton = findViewById(R.id.editButton);
+        } catch (Exception e) {
+            Log.e(TAG, "Error finding views: " + e.getMessage(), e);
+            Toast.makeText(this, "Lỗi khi ánh xạ giao diện.", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
 
         // Khởi tạo repository
         authRepository = new AuthRepository();
@@ -101,6 +117,12 @@ public class MyProfileActivity extends AppCompatActivity {
 
         // Xử lý nút chỉnh sửa
         editButton.setOnClickListener(v -> showEditProfileDialog());
+
+        // Xử lý sự kiện nhấn vào item trong GridView để xem chi tiết cổ vật
+        collectedItemsGrid.setOnItemClickListener((parent, view, position, id) -> {
+            Artifact artifact = collectedArtifacts.get(position);
+            showArtifactDetailDialog(artifact);
+        });
     }
 
     private void loadUserInfo(String userId) {
@@ -110,7 +132,7 @@ public class MyProfileActivity extends AppCompatActivity {
                         currentUser = task.getResult();
                         if (currentUser != null) {
                             userName.setText(currentUser.getName());
-                            userScore.setText("Điểm: " + currentUser.getScore());
+                            // Không cập nhật userScore ở đây, sẽ cập nhật sau khi lấy danh sách cổ vật
                             if (currentUser.getAvatar() != null && !currentUser.getAvatar().isEmpty()) {
                                 Glide.with(this)
                                         .load(currentUser.getAvatar())
@@ -134,17 +156,79 @@ public class MyProfileActivity extends AppCompatActivity {
                         collectedArtifacts.clear();
                         collectedArtifacts.addAll(task.getResult());
                         collectedItemsCount.setText("Số vật phẩm thu thập: " + collectedArtifacts.size());
+
+                        // Tính lại tổng điểm từ danh sách cổ vật
+                        int totalPoints = 0;
+                        for (Artifact artifact : collectedArtifacts) {
+                            totalPoints += artifact.getPoints();
+                        }
+                        userScore.setText("Điểm: " + totalPoints);
+
+                        // Hiển thị danh sách cổ vật
                         CollectedArtifactAdapter adapter = new CollectedArtifactAdapter(MyProfileActivity.this, collectedArtifacts);
                         collectedItemsGrid.setAdapter(adapter);
                     } else {
                         Log.e(TAG, "Failed to load collected artifacts: " + task.getException().getMessage());
+                        Toast.makeText(this, "Không thể tải danh sách cổ vật", Toast.LENGTH_SHORT).show();
                     }
                 });
     }
 
+    private void showArtifactDetailDialog(Artifact artifact) {
+        Dialog dialog = new Dialog(this);
+        try {
+            dialog.setContentView(R.layout.dialog_artifact_detail);
+        } catch (Exception e) {
+            Log.e(TAG, "Error inflating dialog layout: " + e.getMessage(), e);
+            Toast.makeText(this, "Không thể mở chi tiết cổ vật.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        TextView artifactName = dialog.findViewById(R.id.artifactName);
+        TextView artifactDescription = dialog.findViewById(R.id.artifactDescription);
+        TextView artifactRarity = dialog.findViewById(R.id.artifactRarity);
+        TextView artifactPoints = dialog.findViewById(R.id.artifactPoints);
+        ImageView artifactImage = dialog.findViewById(R.id.artifactImage);
+        TextView collectedAtText = dialog.findViewById(R.id.collectedAtText);
+        Button closeButton = dialog.findViewById(R.id.closeButton);
+
+        artifactName.setText(artifact.getName());
+        artifactDescription.setText(artifact.getDescription());
+        artifactRarity.setText("Độ hiếm: " + artifact.getRarity());
+        artifactPoints.setText("Điểm: " + artifact.getPoints());
+
+        if (artifact.getCollectedAt() != null) {
+            SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault());
+            String collectedAtStr = dateFormat.format(artifact.getCollectedAt().toDate());
+            collectedAtText.setText("Thu thập vào: " + collectedAtStr);
+        } else {
+            collectedAtText.setText("Thu thập vào: Không xác định");
+        }
+
+        if (artifact.getImageUrl() != null && !artifact.getImageUrl().isEmpty()) {
+            Glide.with(this)
+                    .load(artifact.getImageUrl())
+                    .placeholder(R.drawable.placeholder_image)
+                    .error(R.drawable.error_image)
+                    .into(artifactImage);
+        } else {
+            artifactImage.setImageResource(R.drawable.error_image);
+        }
+
+        closeButton.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
+    }
+
     private void showEditProfileDialog() {
         Dialog dialog = new Dialog(this);
-        dialog.setContentView(R.layout.dialog_edit_profile);
+        try {
+            dialog.setContentView(R.layout.dialog_edit_profile);
+        } catch (Exception e) {
+            Log.e(TAG, "Error inflating dialog layout: " + e.getMessage(), e);
+            Toast.makeText(this, "Không thể mở dialog chỉnh sửa.", Toast.LENGTH_LONG).show();
+            return;
+        }
 
         EditText nameEditText = dialog.findViewById(R.id.nameEditText);
         avatarPreview = dialog.findViewById(R.id.avatarPreview);
@@ -152,7 +236,6 @@ public class MyProfileActivity extends AppCompatActivity {
         Button cancelButton = dialog.findViewById(R.id.cancelButton);
         Button saveButton = dialog.findViewById(R.id.saveButton);
 
-        // Điền thông tin hiện tại vào dialog
         nameEditText.setText(currentUser.getName());
         if (currentUser.getAvatar() != null && !currentUser.getAvatar().isEmpty()) {
             Glide.with(this)
@@ -163,7 +246,6 @@ public class MyProfileActivity extends AppCompatActivity {
             avatarPreview.setImageResource(R.drawable.default_avatar);
         }
 
-        // Xử lý nút chọn ảnh
         selectAvatarButton.setOnClickListener(v -> {
             if (checkStoragePermission()) {
                 Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
@@ -173,13 +255,11 @@ public class MyProfileActivity extends AppCompatActivity {
             }
         });
 
-        // Xử lý nút hủy
         cancelButton.setOnClickListener(v -> {
             selectedImageUri = null;
             dialog.dismiss();
         });
 
-        // Xử lý nút lưu
         saveButton.setOnClickListener(v -> {
             String newName = nameEditText.getText().toString().trim();
 
