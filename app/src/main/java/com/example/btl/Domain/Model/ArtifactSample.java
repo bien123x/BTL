@@ -51,7 +51,7 @@ public class ArtifactSample {
         samples.add(new ArtifactSample(
                 "Cổ vật 2",
                 "Mô tả cổ vật 2",
-                "https://res.cloudinary.com/dnlgpuwyr/image/upload/v1744471189/artifact2_rid2rb.png ",
+                "https://res.cloudinary.com/dnlgpuwyr/image/upload/v1744471189/artifact2_rid2rb.png",
                 "Uncommon", // Đổi từ 2 sang "Uncommon"
                 60
         ));
