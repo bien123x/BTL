@@ -33,7 +33,7 @@ public class ChatActivity extends AppCompatActivity {
     private ImageButton sendButton;
     private ImageView userAvatar;
     private TextView userName;
-    private ImageButton backButton;
+    private ImageView backButton;
     private List<Message> messageList;
     private MessageAdapter adapter;
     private AuthRepository authRepository;
