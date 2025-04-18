@@ -20,14 +20,29 @@
             android:src="@drawable/ic_back"
             android:contentDescription="Quay lại" />
 
-        <ImageView
-            android:id="@+id/userAvatar"
+        <RelativeLayout
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:layout_marginStart="16dp"
-            android:src="@drawable/default_avatar"
-            android:scaleType="centerCrop"
-            android:background="@drawable/circle_background" />
+            android:layout_marginStart="16dp">
+
+            <ImageView
+                android:id="@+id/userAvatar"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/default_avatar"
+                android:scaleType="centerCrop"
+                android:background="@drawable/circle_background" />
+
+            <!-- Chấm trạng thái online -->
+            <View
+                android:id="@+id/onlineStatus"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:background="@drawable/online_status_circle"
+                android:layout_alignParentBottom="true"
+                android:layout_alignParentEnd="true"
+                android:visibility="gone" />
+        </RelativeLayout>
 
         <TextView
             android:id="@+id/userName"
