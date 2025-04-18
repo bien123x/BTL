@@ -24,7 +24,7 @@ public class UserProfileActivity extends AppCompatActivity {
     private TextView collectedItemsCount;
     private TextView userScore;
     private GridView collectedItemsGrid;
-    private ImageButton backButton;
+    private ImageView backButton; // Đổi từ ImageButton thành ImageView
     private ImageButton messageButton;
     private User user;
     private ArtifactRepository artifactRepository;
@@ -58,7 +58,6 @@ public class UserProfileActivity extends AppCompatActivity {
 
         // Hiển thị thông tin người dùng
         userName.setText(user.getName());
-        userScore.setText("Điểm: " + user.getScore());
         if (user.getAvatar() != null && !user.getAvatar().isEmpty()) {
             Glide.with(this)
                     .load(user.getAvatar())
@@ -68,7 +67,7 @@ public class UserProfileActivity extends AppCompatActivity {
             userAvatar.setImageResource(R.drawable.default_avatar);
         }
 
-        // Tải danh sách vật phẩm đã thu thập
+        // Tải danh sách vật phẩm đã thu thập và tính điểm
         loadCollectedArtifacts();
 
         // Xử lý nút quay lại
@@ -89,10 +88,20 @@ public class UserProfileActivity extends AppCompatActivity {
                         collectedArtifacts.clear();
                         collectedArtifacts.addAll(task.getResult());
                         collectedItemsCount.setText("Số vật phẩm thu thập: " + collectedArtifacts.size());
+
+                        // Tính tổng điểm từ danh sách cổ vật
+                        int totalPoints = 0;
+                        for (Artifact artifact : collectedArtifacts) {
+                            totalPoints += artifact.getPoints();
+                        }
+                        userScore.setText("Điểm: " + totalPoints);
+
+                        // Hiển thị danh sách cổ vật
                         CollectedArtifactAdapter adapter = new CollectedArtifactAdapter(UserProfileActivity.this, collectedArtifacts);
                         collectedItemsGrid.setAdapter(adapter);
                     } else {
                         Log.e(TAG, "Failed to load collected artifacts: " + task.getException().getMessage());
+                        userScore.setText("Điểm: 0"); // Hiển thị mặc định nếu có lỗi
                     }
                 });
     }

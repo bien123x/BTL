@@ -22,6 +22,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.bumptech.glide.Glide;
+import com.cloudinary.android.MediaManager;
+import com.cloudinary.android.callback.ErrorInfo;
+import com.cloudinary.android.callback.UploadCallback;
 import com.example.btl.Adapter.CollectedArtifactAdapter;
 import com.example.btl.Domain.Model.Artifact;
 import com.example.btl.Domain.Model.User;
@@ -29,13 +32,12 @@ import com.example.btl.Domain.Repository.ArtifactRepository;
 import com.example.btl.Domain.Repository.AuthRepository;
 import com.example.btl.Domain.Repository.UserRepository;
 import com.example.btl.R;
-import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
 
 public class MyProfileActivity extends AppCompatActivity {
     private static final String TAG = "MyProfileActivity";
@@ -46,13 +48,12 @@ public class MyProfileActivity extends AppCompatActivity {
     private TextView userScore;
     private GridView collectedItemsGrid;
     private ImageView backButton;
-    private ImageView editButton;
+    private ImageButton editButton;
     private User currentUser;
     private AuthRepository authRepository;
     private UserRepository userRepository;
     private ArtifactRepository artifactRepository;
     private List<Artifact> collectedArtifacts;
-    private FirebaseStorage storage;
     private Uri selectedImageUri;
     private ImageView avatarPreview;
 
@@ -73,22 +74,35 @@ public class MyProfileActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_my_profile);
+        try {
+            setContentView(R.layout.activity_my_profile);
+        } catch (Exception e) {
+            Log.e(TAG, "Error inflating layout: " + e.getMessage(), e);
+            Toast.makeText(this, "Không thể tải giao diện. Vui lòng thử lại.", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
 
         // Ánh xạ các view
-        userAvatar = findViewById(R.id.userAvatar);
-        userName = findViewById(R.id.userName);
-        collectedItemsCount = findViewById(R.id.collectedItemsCount);
-        userScore = findViewById(R.id.userScore);
-        collectedItemsGrid = findViewById(R.id.collectedItemsGrid);
-        backButton = findViewById(R.id.backButton);
-        editButton = findViewById(R.id.editButton);
+        try {
+            userAvatar = findViewById(R.id.userAvatar);
+            userName = findViewById(R.id.userName);
+            collectedItemsCount = findViewById(R.id.collectedItemsCount);
+            userScore = findViewById(R.id.userScore);
+            collectedItemsGrid = findViewById(R.id.collectedItemsGrid);
+            backButton = findViewById(R.id.backButton);
+            editButton = findViewById(R.id.editButton);
+        } catch (Exception e) {
+            Log.e(TAG, "Error finding views: " + e.getMessage(), e);
+            Toast.makeText(this, "Lỗi khi ánh xạ giao diện.", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
 
         // Khởi tạo repository
         authRepository = new AuthRepository();
         userRepository = new UserRepository();
         artifactRepository = new ArtifactRepository();
-        storage = FirebaseStorage.getInstance();
         collectedArtifacts = new ArrayList<>();
 
         // Lấy thông tin người dùng hiện tại
@@ -103,6 +117,12 @@ public class MyProfileActivity extends AppCompatActivity {
 
         // Xử lý nút chỉnh sửa
         editButton.setOnClickListener(v -> showEditProfileDialog());
+
+        // Xử lý sự kiện nhấn vào item trong GridView để xem chi tiết cổ vật
+        collectedItemsGrid.setOnItemClickListener((parent, view, position, id) -> {
+            Artifact artifact = collectedArtifacts.get(position);
+            showArtifactDetailDialog(artifact);
+        });
     }
 
     private void loadUserInfo(String userId) {
@@ -112,7 +132,7 @@ public class MyProfileActivity extends AppCompatActivity {
                         currentUser = task.getResult();
                         if (currentUser != null) {
                             userName.setText(currentUser.getName());
-                            userScore.setText("Điểm: " + currentUser.getScore());
+                            // Không cập nhật userScore ở đây, sẽ cập nhật sau khi lấy danh sách cổ vật
                             if (currentUser.getAvatar() != null && !currentUser.getAvatar().isEmpty()) {
                                 Glide.with(this)
                                         .load(currentUser.getAvatar())
@@ -136,17 +156,79 @@ public class MyProfileActivity extends AppCompatActivity {
                         collectedArtifacts.clear();
                         collectedArtifacts.addAll(task.getResult());
                         collectedItemsCount.setText("Số vật phẩm thu thập: " + collectedArtifacts.size());
+
+                        // Tính lại tổng điểm từ danh sách cổ vật
+                        int totalPoints = 0;
+                        for (Artifact artifact : collectedArtifacts) {
+                            totalPoints += artifact.getPoints();
+                        }
+                        userScore.setText("Điểm: " + totalPoints);
+
+                        // Hiển thị danh sách cổ vật
                         CollectedArtifactAdapter adapter = new CollectedArtifactAdapter(MyProfileActivity.this, collectedArtifacts);
                         collectedItemsGrid.setAdapter(adapter);
                     } else {
                         Log.e(TAG, "Failed to load collected artifacts: " + task.getException().getMessage());
+                        Toast.makeText(this, "Không thể tải danh sách cổ vật", Toast.LENGTH_SHORT).show();
                     }
                 });
     }
 
+    private void showArtifactDetailDialog(Artifact artifact) {
+        Dialog dialog = new Dialog(this);
+        try {
+            dialog.setContentView(R.layout.dialog_artifact_detail);
+        } catch (Exception e) {
+            Log.e(TAG, "Error inflating dialog layout: " + e.getMessage(), e);
+            Toast.makeText(this, "Không thể mở chi tiết cổ vật.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        TextView artifactName = dialog.findViewById(R.id.artifactName);
+        TextView artifactDescription = dialog.findViewById(R.id.artifactDescription);
+        TextView artifactRarity = dialog.findViewById(R.id.artifactRarity);
+        TextView artifactPoints = dialog.findViewById(R.id.artifactPoints);
+        ImageView artifactImage = dialog.findViewById(R.id.artifactImage);
+        TextView collectedAtText = dialog.findViewById(R.id.collectedAtText);
+        Button closeButton = dialog.findViewById(R.id.closeButton);
+
+        artifactName.setText(artifact.getName());
+        artifactDescription.setText(artifact.getDescription());
+        artifactRarity.setText("Độ hiếm: " + artifact.getRarity());
+        artifactPoints.setText("Điểm: " + artifact.getPoints());
+
+        if (artifact.getCollectedAt() != null) {
+            SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault());
+            String collectedAtStr = dateFormat.format(artifact.getCollectedAt().toDate());
+            collectedAtText.setText("Thu thập vào: " + collectedAtStr);
+        } else {
+            collectedAtText.setText("Thu thập vào: Không xác định");
+        }
+
+        if (artifact.getImageUrl() != null && !artifact.getImageUrl().isEmpty()) {
+            Glide.with(this)
+                    .load(artifact.getImageUrl())
+                    .placeholder(R.drawable.placeholder_image)
+                    .error(R.drawable.error_image)
+                    .into(artifactImage);
+        } else {
+            artifactImage.setImageResource(R.drawable.error_image);
+        }
+
+        closeButton.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
+    }
+
     private void showEditProfileDialog() {
         Dialog dialog = new Dialog(this);
-        dialog.setContentView(R.layout.dialog_edit_profile);
+        try {
+            dialog.setContentView(R.layout.dialog_edit_profile);
+        } catch (Exception e) {
+            Log.e(TAG, "Error inflating dialog layout: " + e.getMessage(), e);
+            Toast.makeText(this, "Không thể mở dialog chỉnh sửa.", Toast.LENGTH_LONG).show();
+            return;
+        }
 
         EditText nameEditText = dialog.findViewById(R.id.nameEditText);
         avatarPreview = dialog.findViewById(R.id.avatarPreview);
@@ -154,7 +236,6 @@ public class MyProfileActivity extends AppCompatActivity {
         Button cancelButton = dialog.findViewById(R.id.cancelButton);
         Button saveButton = dialog.findViewById(R.id.saveButton);
 
-        // Điền thông tin hiện tại vào dialog
         nameEditText.setText(currentUser.getName());
         if (currentUser.getAvatar() != null && !currentUser.getAvatar().isEmpty()) {
             Glide.with(this)
@@ -165,7 +246,6 @@ public class MyProfileActivity extends AppCompatActivity {
             avatarPreview.setImageResource(R.drawable.default_avatar);
         }
 
-        // Xử lý nút chọn ảnh
         selectAvatarButton.setOnClickListener(v -> {
             if (checkStoragePermission()) {
                 Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
@@ -175,13 +255,11 @@ public class MyProfileActivity extends AppCompatActivity {
             }
         });
 
-        // Xử lý nút hủy
         cancelButton.setOnClickListener(v -> {
             selectedImageUri = null;
             dialog.dismiss();
         });
 
-        // Xử lý nút lưu
         saveButton.setOnClickListener(v -> {
             String newName = nameEditText.getText().toString().trim();
 
@@ -195,7 +273,7 @@ public class MyProfileActivity extends AppCompatActivity {
             updates.put("name", newName);
 
             if (selectedImageUri != null) {
-                uploadImageToFirebaseStorage(selectedImageUri, newName, dialog);
+                uploadImageToCloudinary(selectedImageUri, newName, dialog);
             } else {
                 updates.put("avatar", currentUser.getAvatar() != null ? currentUser.getAvatar() : "");
                 updateUserInfo(updates, newName, dialog);
@@ -205,12 +283,93 @@ public class MyProfileActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    private void uploadImageToCloudinary(Uri imageUri, String newName, Dialog dialog) {
+        String userId = authRepository.getCurrentUser().getUid();
+
+        MediaManager.get().upload(imageUri)
+                .unsigned("covat-upload")
+                .option("folder", "avatars/" + userId)
+                .callback(new UploadCallback() {
+                    @Override
+                    public void onStart(String requestId) {
+                        Log.d(TAG, "Upload started: " + requestId);
+                    }
+
+                    @Override
+                    public void onProgress(String requestId, long bytes, long totalBytes) {
+                        Log.d(TAG, "Uploading: " + bytes + "/" + totalBytes);
+                    }
+
+                    @Override
+                    public void onSuccess(String requestId, Map resultData) {
+                        String imageUrl = resultData.get("secure_url").toString();
+                        Log.d(TAG, "Upload success, URL: " + imageUrl);
+                        Map<String, Object> updates = new HashMap<>();
+                        updates.put("name", newName);
+                        updates.put("avatar", imageUrl);
+                        updateUserInfo(updates, newName, dialog);
+                    }
+
+                    @Override
+                    public void onError(String requestId, ErrorInfo error) {
+                        Log.e(TAG, "Upload error: " + error.getDescription());
+                        Map<String, Object> updates = new HashMap<>();
+                        updates.put("name", newName);
+                        updates.put("avatar", currentUser.getAvatar() != null ? currentUser.getAvatar() : "");
+                        updateUserInfo(updates, newName, dialog);
+                        runOnUiThread(() -> Toast.makeText(MyProfileActivity.this, "Tải ảnh lên thất bại: " + error.getDescription(), Toast.LENGTH_SHORT).show());
+                    }
+
+                    @Override
+                    public void onReschedule(String requestId, ErrorInfo error) {
+                        Log.d(TAG, "Upload rescheduled: " + error.getDescription());
+                    }
+                })
+                .dispatch(this);
+    }
+
+    private void updateUserInfo(Map<String, Object> updates, String newName, Dialog dialog) {
+        String userId = authRepository.getCurrentUser().getUid();
+        userRepository.updateUser(userId, updates)
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        runOnUiThread(() -> {
+                            Toast.makeText(this, "Cập nhật thông tin thành công", Toast.LENGTH_SHORT).show();
+                            currentUser.setName(newName);
+                            currentUser.setAvatar(updates.get("avatar").toString());
+                            userName.setText(newName);
+                            if (currentUser.getAvatar() != null && !currentUser.getAvatar().isEmpty()) {
+                                Glide.with(this)
+                                        .load(currentUser.getAvatar())
+                                        .placeholder(R.drawable.default_avatar)
+                                        .into(userAvatar);
+                            } else {
+                                userAvatar.setImageResource(R.drawable.default_avatar);
+                            }
+                            selectedImageUri = null;
+                            dialog.dismiss();
+                        });
+                    } else {
+                        runOnUiThread(() -> {
+                            Toast.makeText(this, "Cập nhật thất bại: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                            Log.e(TAG, "Failed to update user info: " + task.getException().getMessage());
+                            dialog.dismiss();
+                        });
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    runOnUiThread(() -> {
+                        Toast.makeText(this, "Lỗi: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        Log.e(TAG, "Update user failed: " + e.getMessage());
+                        dialog.dismiss();
+                    });
+                });
+    }
+
     private boolean checkStoragePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Android 13 trở lên
             return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED;
         } else {
-            // Android 12 trở xuống
             return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
         }
     }
@@ -235,54 +394,5 @@ public class MyProfileActivity extends AppCompatActivity {
                 Toast.makeText(this, "Ứng dụng cần quyền truy cập bộ nhớ để chọn ảnh", Toast.LENGTH_LONG).show();
             }
         }
-    }
-
-    private void uploadImageToFirebaseStorage(Uri imageUri, String newName, Dialog dialog) {
-        String userId = authRepository.getCurrentUser().getUid();
-        StorageReference storageRef = storage.getReference().child("avatars/" + userId + "/" + UUID.randomUUID().toString() + ".jpg");
-
-        storageRef.putFile(imageUri)
-                .addOnSuccessListener(taskSnapshot -> {
-                    storageRef.getDownloadUrl().addOnSuccessListener(uri -> {
-                        String imageUrl = uri.toString();
-                        Map<String, Object> updates = new HashMap<>();
-                        updates.put("name", newName);
-                        updates.put("avatar", imageUrl);
-                        updateUserInfo(updates, newName, dialog);
-                    }).addOnFailureListener(e -> {
-                        Toast.makeText(this, "Không thể lấy URL ảnh: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                        Log.e(TAG, "Failed to get download URL: " + e.getMessage());
-                    });
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Tải ảnh lên thất bại: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    Log.e(TAG, "Failed to upload image: " + e.getMessage());
-                });
-    }
-
-    private void updateUserInfo(Map<String, Object> updates, String newName, Dialog dialog) {
-        String userId = authRepository.getCurrentUser().getUid();
-        userRepository.updateUser(userId, updates)
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        Toast.makeText(this, "Cập nhật thông tin thành công", Toast.LENGTH_SHORT).show();
-                        currentUser.setName(newName);
-                        currentUser.setAvatar(updates.get("avatar").toString());
-                        userName.setText(newName);
-                        if (currentUser.getAvatar() != null && !currentUser.getAvatar().isEmpty()) {
-                            Glide.with(this)
-                                    .load(currentUser.getAvatar())
-                                    .placeholder(R.drawable.default_avatar)
-                                    .into(userAvatar);
-                        } else {
-                            userAvatar.setImageResource(R.drawable.default_avatar);
-                        }
-                        selectedImageUri = null;
-                        dialog.dismiss();
-                    } else {
-                        Toast.makeText(this, "Cập nhật thất bại: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
-                        Log.e(TAG, "Failed to update user info: " + task.getException().getMessage());
-                    }
-                });
     }
 }

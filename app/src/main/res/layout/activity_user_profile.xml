@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -34,9 +35,10 @@
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:layout_marginStart="16dp"
-            android:src="@drawable/ic_message"
             android:background="?android:attr/selectableItemBackground"
-            android:contentDescription="Tin nhắn" />
+            android:contentDescription="Tin nhắn"
+            android:src="@drawable/ic_message"
+            tools:ignore="TouchTargetSizeCheck" />
     </LinearLayout>
 
     <!-- Thông tin người chơi -->

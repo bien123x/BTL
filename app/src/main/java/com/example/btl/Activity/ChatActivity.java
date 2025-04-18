@@ -2,6 +2,7 @@ package com.example.btl.Activity;
 
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -33,7 +34,8 @@ public class ChatActivity extends AppCompatActivity {
     private ImageButton sendButton;
     private ImageView userAvatar;
     private TextView userName;
-    private ImageButton backButton;
+    private ImageView backButton;
+    private View onlineStatus;
     private List<Message> messageList;
     private MessageAdapter adapter;
     private AuthRepository authRepository;
@@ -55,6 +57,7 @@ public class ChatActivity extends AppCompatActivity {
         userAvatar = findViewById(R.id.userAvatar);
         userName = findViewById(R.id.userName);
         backButton = findViewById(R.id.backButton);
+        onlineStatus = findViewById(R.id.onlineStatus);
 
         // Khởi tạo
         authRepository = new AuthRepository();
@@ -80,6 +83,8 @@ public class ChatActivity extends AppCompatActivity {
         } else {
             userAvatar.setImageResource(R.drawable.default_avatar);
         }
+        // Hiển thị trạng thái online
+        onlineStatus.setVisibility(otherUser.isOnline() ? View.VISIBLE : View.GONE);
 
         // Thiết lập RecyclerView
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
