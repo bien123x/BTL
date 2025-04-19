@@ -31,12 +31,12 @@ public class LoginActivity extends AppCompatActivity {
 
         // Kiểm tra nếu người dùng đã đăng nhập
         FirebaseUser currentUser = authRepository.getCurrentUser();
-        if (currentUser != null) {
-            Log.d(TAG, "User already logged in: " + currentUser.getUid());
-            startActivity(new Intent(LoginActivity.this, MainActivity.class));
-            finish();
-            return;
-        }
+//        if (currentUser != null) {
+//            Log.d(TAG, "User already logged in: " + currentUser.getUid());
+//            startActivity(new Intent(LoginActivity.this, MainActivity.class));
+//            finish();
+//            return;
+//        }
 
         // Sự kiện nhấn nút đăng nhập
         binding.loginButton.setOnClickListener(v -> {
