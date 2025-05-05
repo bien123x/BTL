@@ -68,7 +68,7 @@ public class ChatActivity extends AppCompatActivity {
         // Lấy thông tin người dùng được chọn từ Intent
         otherUser = (User) getIntent().getSerializableExtra("otherUser");
         if (otherUser == null) {
-            Log.e(TAG, "Other user is null");
+//            Log.e(TAG, "Other user is null");
             finish();
             return;
         }
@@ -120,7 +120,8 @@ public class ChatActivity extends AppCompatActivity {
                 conversationData.put("timestamp", System.currentTimeMillis());
                 conversationRef.set(conversationData)
                         .addOnSuccessListener(aVoid -> Log.d(TAG, "Created new conversation: " + conversationId))
-                        .addOnFailureListener(e -> Log.e(TAG, "Failed to create conversation: " + e.getMessage()));
+                        .addOnFailureListener(e -> Log.e(TAG, "Failed to create conversation: " + e.getMessage()))
+                ;
             }
             // Lắng nghe tin nhắn
             listenForMessages();
@@ -134,7 +135,7 @@ public class ChatActivity extends AppCompatActivity {
                 .orderBy("timestamp", Query.Direction.ASCENDING)
                 .addSnapshotListener((snapshots, e) -> {
                     if (e != null) {
-                        Log.e(TAG, "Listen failed: " + e.getMessage());
+//                        Log.e(TAG, "Listen failed: " + e.getMessage());
                         return;
                     }
                     if (snapshots != null) {

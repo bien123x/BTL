@@ -11,12 +11,13 @@ public class User implements Serializable {
     private boolean online;
     private double latitude;
     private double longitude;
+    private int itemCount;
 
     // Constructor mặc định
     public User() {}
 
     // Constructor mới với các tham số
-    public User(String id, String name, String email, String avatar, long score, boolean online) {
+    public User(String id, String name, String email, String avatar, long score, boolean online ) {
         this.id = id;
         this.name = name;
         this.email = email;
@@ -25,6 +26,7 @@ public class User implements Serializable {
         this.online = online;
         this.latitude = 0.0;
         this.longitude = 0.0;
+        this.itemCount = 0;
     }
 
     public String getId() {
@@ -90,4 +92,6 @@ public class User implements Serializable {
     public void setLongitude(double longitude) {
         this.longitude = longitude;
     }
+    public int getItemCount() { return itemCount; }
+    public void setItemCount(int itemCount) { this.itemCount = itemCount; }
 }

@@ -51,7 +51,7 @@ public class UserProfileActivity extends AppCompatActivity {
         // Lấy thông tin người dùng từ Intent
         user = (User) getIntent().getSerializableExtra("user");
         if (user == null) {
-            Log.e(TAG, "User is null");
+//            Log.e(TAG, "User is null");
             finish();
             return;
         }
@@ -100,7 +100,7 @@ public class UserProfileActivity extends AppCompatActivity {
                         CollectedArtifactAdapter adapter = new CollectedArtifactAdapter(UserProfileActivity.this, collectedArtifacts);
                         collectedItemsGrid.setAdapter(adapter);
                     } else {
-                        Log.e(TAG, "Failed to load collected artifacts: " + task.getException().getMessage());
+//                        Log.e(TAG, "Failed to load collected artifacts: " + task.getException().getMessage());
                         userScore.setText("Điểm: 0"); // Hiển thị mặc định nếu có lỗi
                     }
                 });

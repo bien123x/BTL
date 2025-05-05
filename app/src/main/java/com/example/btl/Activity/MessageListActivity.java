@@ -50,7 +50,7 @@ public class MessageListActivity extends AppCompatActivity {
         if (backButton != null) {
             backButton.setOnClickListener(v -> finish());
         } else {
-            Log.e(TAG, "backButton không tìm thấy trong layout");
+//            Log.e(TAG, "backButton không tìm thấy trong layout");
         }
 
         // Thiết lập RecyclerView
@@ -95,7 +95,7 @@ public class MessageListActivity extends AppCompatActivity {
                                         .document(userId)
                                         .addSnapshotListener((snapshot, e) -> {
                                             if (e != null) {
-                                                Log.e(TAG, "Failed to listen for user " + userId + ": " + e.getMessage());
+//                                                Log.e(TAG, "Failed to listen for user " + userId + ": " + e.getMessage());
                                                 return;
                                             }
                                             if (snapshot != null && snapshot.exists()) {
@@ -122,7 +122,7 @@ public class MessageListActivity extends AppCompatActivity {
                             }
                         }
                     } else {
-                        Log.e(TAG, "Failed to load messages: " + task.getException().getMessage());
+//                        Log.e(TAG, "Failed to load messages: " + task.getException().getMessage());
                     }
                 });
     }

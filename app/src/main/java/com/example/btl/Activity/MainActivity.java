@@ -127,10 +127,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         if (mapFragment != null) {
             mapFragment.getMapAsync(this);
-            Log.d(TAG, "SupportMapFragment initialized successfully");
+//            Log.d(TAG, "SupportMapFragment initialized successfully");
         } else {
             Toast.makeText(this, "Không thể khởi tạo bản đồ", Toast.LENGTH_LONG).show();
-            Log.e(TAG, "SupportMapFragment is null");
+//            Log.e(TAG, "SupportMapFragment is null");
         }
 
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
@@ -233,14 +233,16 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         locationData.put("longitude", longitude);
         userRepository.updateUserLocation(userId, locationData)
                 .addOnSuccessListener(aVoid -> Log.d(TAG, "Updated user location in Firestore"))
-                .addOnFailureListener(e -> Log.e(TAG, "Failed to update user location: " + e.getMessage()));
+                .addOnFailureListener(e -> Log.e(TAG, "Failed to update user location: " + e.getMessage()))
+        ;
     }
 
     private void updateOnlineStatus(boolean online) {
         String userId = authRepository.getCurrentUser().getUid();
         userRepository.updateOnlineStatus(userId, online)
                 .addOnSuccessListener(aVoid -> Log.d(TAG, "Updated online status to " + online))
-                .addOnFailureListener(e -> Log.e(TAG, "Failed to update online status: " + e.getMessage()));
+                .addOnFailureListener(e -> Log.e(TAG, "Failed to update online status: " + e.getMessage()))
+        ;
     }
 
     @Override
@@ -248,11 +250,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         mMap = googleMap;
         if (mMap == null) {
             Toast.makeText(this, "Không thể tải bản đồ", Toast.LENGTH_LONG).show();
-            Log.e(TAG, "GoogleMap is null");
+//            Log.e(TAG, "GoogleMap is null");
             return;
         }
 
-        Log.d(TAG, "GoogleMap initialized successfully");
+//        Log.d(TAG, "GoogleMap initialized successfully");
         mMap.setOnMarkerClickListener(this);
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
@@ -260,7 +262,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             startLocationUpdates();
         } else {
             Toast.makeText(this, "Quyền định vị chưa được cấp", Toast.LENGTH_SHORT).show();
-            Log.w(TAG, "Location permission not granted");
+//            Log.w(TAG, "Location permission not granted");
         }
 
         loadOtherUsers();
@@ -320,7 +322,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
                             @Override
                             public void onLoadFailed(Drawable errorDrawable) {
-                                Log.e(TAG, "Failed to load artifact image: " + artifact.getImageUrl());
+//                                Log.e(TAG, "Failed to load artifact image: " + artifact.getImageUrl());
                                 marker.setIcon(getBitmapDescriptorFromVector(R.drawable.error_image));
                             }
                         });
@@ -360,7 +362,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                             userMap.put(marker.getId(), user);
                         }
                     } else {
-                        Log.e(TAG, "Failed to load other users: " + task.getException().getMessage());
+//                        Log.e(TAG, "Failed to load other users: " + task.getException().getMessage());
                     }
                 });
     }
@@ -551,7 +553,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private void startLocationUpdates() {
         LocationRequest locationRequest = LocationRequest.create();
         locationRequest.setInterval(5000);
-        locationRequest.setFastestInterval(2000);
+        locationRequest.setFastestInterval(5000);
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
@@ -564,7 +566,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
             gravity = event.values.clone();
             float x = event.values[0];
-            if (x > 5) {
+            if (x > 15) {
                 Toast.makeText(this, "Bạn đang chạy!", Toast.LENGTH_SHORT).show();
             }
         } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {

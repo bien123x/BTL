@@ -32,7 +32,7 @@ public class RegisterActivity extends AppCompatActivity {
 
         // Sự kiện nhấn nút quay lại
         binding.backButton.setOnClickListener(v -> {
-            Log.d(TAG, "Back button clicked, navigating to LoginActivity");
+//            Log.d(TAG, "Back button clicked, navigating to LoginActivity");
             startActivity(new Intent(RegisterActivity.this, LoginActivity.class));
             finish();
         });
@@ -57,13 +57,13 @@ public class RegisterActivity extends AppCompatActivity {
 
             // Hiển thị loading
             showLoading(true);
-            Log.d(TAG, "Attempting to register with email: " + email);
+//            Log.d(TAG, "Attempting to register with email: " + email);
             register(name, email, password);
         });
 
         // Chuyển đến màn hình đăng nhập
         binding.goToLogin.setOnClickListener(v -> {
-            Log.d(TAG, "Navigating to LoginActivity");
+//            Log.d(TAG, "Navigating to LoginActivity");
             startActivity(new Intent(RegisterActivity.this, LoginActivity.class));
             finish();
         });
@@ -144,13 +144,13 @@ public class RegisterActivity extends AppCompatActivity {
                                 .addOnCompleteListener(task1 -> {
                                     showLoading(false);
                                     if (task1.isSuccessful()) {
-                                        Log.d(TAG, "User data saved successfully for UID: " + firebaseUser.getUid());
+//                                        Log.d(TAG, "User data saved successfully for UID: " + firebaseUser.getUid());
                                         Toast.makeText(this, "Đăng ký thành công! Vui lòng đăng nhập.", Toast.LENGTH_SHORT).show();
                                         startActivity(new Intent(RegisterActivity.this, LoginActivity.class));
                                         finish();
                                     } else {
                                         String errorMessage = task1.getException() != null ? task1.getException().getMessage() : "Lỗi không xác định";
-                                        Log.e(TAG, "Failed to save user data: " + errorMessage);
+//                                        Log.e(TAG, "Failed to save user data: " + errorMessage);
                                         Toast.makeText(this, "Đăng ký thành công nhưng không thể lưu dữ liệu: " + errorMessage, Toast.LENGTH_LONG).show();
                                         startActivity(new Intent(RegisterActivity.this, LoginActivity.class));
                                         finish();
@@ -159,7 +159,7 @@ public class RegisterActivity extends AppCompatActivity {
                     } else {
                         showLoading(false);
                         String errorMessage = task.getException() != null ? task.getException().getMessage() : "Lỗi không xác định";
-                        Log.e(TAG, "Registration failed: " + errorMessage);
+//                        Log.e(TAG, "Registration failed: " + errorMessage);
                         Toast.makeText(this, "Đăng ký thất bại: " + errorMessage, Toast.LENGTH_LONG).show();
                     }
                 });

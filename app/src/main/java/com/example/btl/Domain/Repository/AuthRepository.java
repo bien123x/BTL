@@ -21,14 +21,14 @@ public class AuthRepository {
                     if (task.isSuccessful()) {
                         FirebaseUser user = auth.getCurrentUser();
                         if (user != null) {
-                            Log.d(TAG, "User registered successfully: " + user.getUid());
+//                            Log.d(TAG, "User registered successfully: " + user.getUid());
                             return user;
                         } else {
-                            Log.e(TAG, "FirebaseUser is null after registration");
+//                            Log.e(TAG, "FirebaseUser is null after registration");
                             throw new Exception("Không thể lấy thông tin người dùng sau khi đăng ký");
                         }
                     } else {
-                        Log.e(TAG, "Registration failed: " + task.getException().getMessage());
+//                        Log.e(TAG, "Registration failed: " + task.getException().getMessage());
                         throw task.getException();
                     }
                 });
@@ -41,14 +41,14 @@ public class AuthRepository {
                     if (task.isSuccessful()) {
                         FirebaseUser user = auth.getCurrentUser();
                         if (user != null) {
-                            Log.d(TAG, "User logged in successfully: " + user.getUid());
+//                            Log.d(TAG, "User logged in successfully: " + user.getUid());
                             return user;
                         } else {
-                            Log.e(TAG, "FirebaseUser is null after login");
+//                            Log.e(TAG, "FirebaseUser is null after login");
                             throw new Exception("Không thể lấy thông tin người dùng sau khi đăng nhập");
                         }
                     } else {
-                        Log.e(TAG, "Login failed: " + task.getException().getMessage());
+//                        Log.e(TAG, "Login failed: " + task.getException().getMessage());
                         throw task.getException();
                     }
                 });

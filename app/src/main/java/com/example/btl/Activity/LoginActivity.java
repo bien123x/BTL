@@ -31,12 +31,12 @@ public class LoginActivity extends AppCompatActivity {
 
         // Kiểm tra nếu người dùng đã đăng nhập
         FirebaseUser currentUser = authRepository.getCurrentUser();
-        if (currentUser != null) {
-            Log.d(TAG, "User already logged in: " + currentUser.getUid());
-            startActivity(new Intent(LoginActivity.this, MainActivity.class));
-            finish();
-            return;
-        }
+//        if (currentUser != null) {
+////            Log.d(TAG, "User already logged in: " + currentUser.getUid());
+//            startActivity(new Intent(LoginActivity.this, MainActivity.class));
+//            finish();
+//            return;
+//        }
 
         // Sự kiện nhấn nút đăng nhập
         binding.loginButton.setOnClickListener(v -> {
@@ -56,13 +56,13 @@ public class LoginActivity extends AppCompatActivity {
 
             // Hiển thị loading
             showLoading(true);
-            Log.d(TAG, "Attempting to login with email: " + email);
+//            Log.d(TAG, "Attempting to login with email: " + email);
             login(email, password);
         });
 
         // Chuyển đến màn hình đăng ký
         binding.goToRegister.setOnClickListener(v -> {
-            Log.d(TAG, "Navigating to RegisterActivity");
+//            Log.d(TAG, "Navigating to RegisterActivity");
             startActivity(new Intent(LoginActivity.this, RegisterActivity.class));
             finish();
         });
@@ -113,13 +113,13 @@ public class LoginActivity extends AppCompatActivity {
                         // Cập nhật trạng thái online
                         userRepository.updateOnlineStatus(user.getUid(), true);
 
-                        Log.d(TAG, "Login successful for UID: " + user.getUid());
+//                        Log.d(TAG, "Login successful for UID: " + user.getUid());
                         Toast.makeText(this, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show();
                         startActivity(new Intent(LoginActivity.this, MainActivity.class));
                         finish();
                     } else {
                         String errorMessage = task.getException() != null ? task.getException().getMessage() : "Lỗi không xác định";
-                        Log.e(TAG, "Login failed: " + errorMessage);
+//                        Log.e(TAG, "Login failed: " + errorMessage);
                         Toast.makeText(this, "Đăng nhập thất bại: " + errorMessage, Toast.LENGTH_LONG).show();
                     }
                     showLoading(false);

@@ -30,6 +30,7 @@
         <activity android:name=".Activity.ChatActivity" />
         <activity android:name=".Activity.MyProfileActivity" />
         <activity android:name=".Activity.UserProfileActivity" />
+        <activity android:name=".Activity.InputActivity" />"
         <activity
             android:name=".Activity.LoginActivity"
             android:exported="true">

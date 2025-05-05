@@ -20,9 +20,11 @@ public class ArtifactRepository {
     private final FirebaseFirestore db;
     private static final String ARTIFACTS_COLLECTION = "artifacts";
     private static final String USERS_COLLECTION = "users";
+    private UserRepository userRepository;
 
     public ArtifactRepository() {
         this.db = FirebaseFirestore.getInstance();
+        this.userRepository = new UserRepository();
     }
 
     // Thêm cổ vật vào collection artifacts và cập nhật điểm số người dùng
@@ -54,14 +56,16 @@ public class ArtifactRepository {
                     Task<Void> userTask = getCollectedArtifacts(userId)
                             .continueWithTask(artifactsTask -> {
                                 if (artifactsTask.isSuccessful()) {
-                                    int totalPoints = artifactsTask.getResult().stream()
-                                            .mapToInt(Artifact::getPoints)
-                                            .sum();
-                                    return db.collection(USERS_COLLECTION)
-                                            .document(userId)
-                                            .update("score", totalPoints)
-                                            .addOnSuccessListener(aVoid -> Log.d(TAG, "Score updated to " + totalPoints))
-                                            .addOnFailureListener(e -> Log.e(TAG, "Failed to update score: " + e.getMessage()));
+                                    List<Artifact> artifacts = artifactsTask.getResult();
+                                    int totalPoints = artifacts.stream().mapToInt(Artifact::getPoints).sum();
+                                    int itemCount = artifacts.size();
+                                    Map<String, Object> updates = new HashMap<>();
+                                    updates.put("score", totalPoints);
+                                    updates.put("itemCount", itemCount);
+                                    return userRepository.updateUser(userId, updates)
+                                            .addOnSuccessListener(aVoid -> Log.d(TAG, "Score updated to " + totalPoints + ", ItemCount updated to " + itemCount))
+                                            .addOnFailureListener(e -> Log.e(TAG, "Failed to update user data: " + e.getMessage()))
+                                            ;
                                 } else {
                                     throw artifactsTask.getException();
                                 }
@@ -70,7 +74,8 @@ public class ArtifactRepository {
                     // Chờ cả hai task hoàn thành
                     return Tasks.whenAll(artifactTask, userTask)
                             .addOnSuccessListener(aVoid -> Log.d(TAG, "Added artifact and updated score for user " + userId))
-                            .addOnFailureListener(e -> Log.e(TAG, "Failed to add artifact or update score: " + e.getMessage()));
+                            .addOnFailureListener(e -> Log.e(TAG, "Failed to add artifact or update score: " + e.getMessage()))
+                            ;
                 });
     }
 
@@ -95,10 +100,10 @@ public class ArtifactRepository {
                             artifact.setCollectedAt(document.getTimestamp("collectedAt"));
                             artifacts.add(artifact);
                         }
-                        Log.d(TAG, "Loaded " + artifacts.size() + " artifacts");
+//                        Log.d(TAG, "Loaded " + artifacts.size() + " artifacts");
                         return artifacts;
                     } else {
-                        Log.e(TAG, "Failed to load artifacts: " + task.getException().getMessage());
+//                        Log.e(TAG, "Failed to load artifacts: " + task.getException().getMessage());
                         throw task.getException();
                     }
                 });
@@ -140,10 +145,10 @@ public class ArtifactRepository {
                             artifact.setCollectedAt(document.getTimestamp("collectedAt"));
                             artifacts.add(artifact);
                         }
-                        Log.d(TAG, "Loaded " + artifacts.size() + " collected artifacts for user " + userId);
+//                        Log.d(TAG, "Loaded " + artifacts.size() + " collected artifacts for user " + userId);
                         return artifacts;
                     } else {
-                        Log.e(TAG, "Failed to load collected artifacts: " + task.getException().getMessage());
+//                        Log.e(TAG, "Failed to load collected artifacts: " + task.getException().getMessage());
                         throw task.getException();
                     }
                 });
@@ -159,7 +164,7 @@ public class ArtifactRepository {
                         Long score = task.getResult().getLong("score");
                         return score != null ? score.intValue() : 0;
                     } else {
-                        Log.e(TAG, "Failed to load user score: " + task.getException().getMessage());
+//                        Log.e(TAG, "Failed to load user score: " + task.getException().getMessage());
                         return 0;
                     }
                 });
