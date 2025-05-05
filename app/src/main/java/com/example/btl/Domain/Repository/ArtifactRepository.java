@@ -2,6 +2,7 @@ package com.example.btl.Domain.Repository;
 
 import android.util.Log;
 import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
@@ -18,26 +19,59 @@ public class ArtifactRepository {
     private static final String TAG = "ArtifactRepository";
     private final FirebaseFirestore db;
     private static final String ARTIFACTS_COLLECTION = "artifacts";
+    private static final String USERS_COLLECTION = "users";
 
     public ArtifactRepository() {
         this.db = FirebaseFirestore.getInstance();
     }
 
-    // Thêm cổ vật vào collection artifacts
-    public Task<Void> addArtifact(Artifact artifact) {
-        Map<String, Object> artifactData = new HashMap<>();
-        artifactData.put("id", artifact.getId());
-        artifactData.put("name", artifact.getName());
-        artifactData.put("description", artifact.getDescription());
-        artifactData.put("imageUrl", artifact.getImageUrl());
-        artifactData.put("rarity", artifact.getRarity());
-        artifactData.put("points", artifact.getPoints());
-        artifactData.put("collectedBy", artifact.getCollectedBy());
-        artifactData.put("collectedAt", Timestamp.now());
+    // Thêm cổ vật vào collection artifacts và cập nhật điểm số người dùng
+    public Task<Void> addArtifact(Artifact artifact, String userId) {
+        // Kiểm tra xem cổ vật đã được thu thập chưa
+        return hasUserCollectedArtifact(userId, artifact.getId())
+                .continueWithTask(task -> {
+                    if (task.getResult()) {
+                        // Nếu đã thu thập, không làm gì
+                        return Tasks.forResult(null);
+                    }
+                    // Chuẩn bị dữ liệu cổ vật
+                    Map<String, Object> artifactData = new HashMap<>();
+                    artifactData.put("id", artifact.getId());
+                    artifactData.put("name", artifact.getName());
+                    artifactData.put("description", artifact.getDescription());
+                    artifactData.put("imageUrl", artifact.getImageUrl());
+                    artifactData.put("rarity", artifact.getRarity());
+                    artifactData.put("points", artifact.getPoints());
+                    artifactData.put("collectedBy", userId);
+                    artifactData.put("collectedAt", Timestamp.now());
 
-        return db.collection(ARTIFACTS_COLLECTION)
-                .document(artifact.getId())
-                .set(artifactData);
+                    // Lưu cổ vật vào Firestore
+                    Task<Void> artifactTask = db.collection(ARTIFACTS_COLLECTION)
+                            .document(artifact.getId())
+                            .set(artifactData);
+
+                    // Tính tổng điểm và cập nhật score
+                    Task<Void> userTask = getCollectedArtifacts(userId)
+                            .continueWithTask(artifactsTask -> {
+                                if (artifactsTask.isSuccessful()) {
+                                    int totalPoints = artifactsTask.getResult().stream()
+                                            .mapToInt(Artifact::getPoints)
+                                            .sum();
+                                    return db.collection(USERS_COLLECTION)
+                                            .document(userId)
+                                            .update("score", totalPoints)
+                                            .addOnSuccessListener(aVoid -> Log.d(TAG, "Score updated to " + totalPoints))
+                                            .addOnFailureListener(e -> Log.e(TAG, "Failed to update score: " + e.getMessage()));
+                                } else {
+                                    throw artifactsTask.getException();
+                                }
+                            });
+
+                    // Chờ cả hai task hoàn thành
+                    return Tasks.whenAll(artifactTask, userTask)
+                            .addOnSuccessListener(aVoid -> Log.d(TAG, "Added artifact and updated score for user " + userId))
+                            .addOnFailureListener(e -> Log.e(TAG, "Failed to add artifact or update score: " + e.getMessage()));
+                });
     }
 
     // Lấy tất cả cổ vật
@@ -111,6 +145,22 @@ public class ArtifactRepository {
                     } else {
                         Log.e(TAG, "Failed to load collected artifacts: " + task.getException().getMessage());
                         throw task.getException();
+                    }
+                });
+    }
+
+    // Lấy điểm số của người dùng
+    public Task<Integer> getUserScore(String userId) {
+        return db.collection(USERS_COLLECTION)
+                .document(userId)
+                .get()
+                .continueWith(task -> {
+                    if (task.isSuccessful() && task.getResult().exists()) {
+                        Long score = task.getResult().getLong("score");
+                        return score != null ? score.intValue() : 0;
+                    } else {
+                        Log.e(TAG, "Failed to load user score: " + task.getException().getMessage());
+                        return 0;
                     }
                 });
     }

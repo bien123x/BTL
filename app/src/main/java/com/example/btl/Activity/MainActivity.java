@@ -415,7 +415,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         } else {
                             binding.collectButton.setOnClickListener(v -> {
                                 artifact.setCollectedBy(userId);
-                                artifactRepository.addArtifact(artifact)
+                                artifactRepository.addArtifact(artifact,userId)
                                         .addOnCompleteListener(collectTask -> {
                                             if (collectTask.isSuccessful()) {
                                                 Toast.makeText(this, "Thu thập thành công! Bạn nhận được " + artifact.getPoints() + " điểm", Toast.LENGTH_SHORT).show();
@@ -505,7 +505,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful() && !task.getResult()) {
                         artifact.setCollectedBy(userId);
-                        artifactRepository.addArtifact(artifact)
+                        artifactRepository.addArtifact(artifact,userId)
                                 .addOnCompleteListener(collectTask -> {
                                     if (collectTask.isSuccessful()) {
                                         Toast.makeText(this, "Thu thập thành công! Bạn nhận được " + artifact.getPoints() + " điểm", Toast.LENGTH_SHORT).show();
